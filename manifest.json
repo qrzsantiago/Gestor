@@ -1,0 +1,20 @@
+{
+  "name": "Finanzas · Control Total",
+  "short_name": "Finanzas",
+  "description": "App financiera personal: deuda, ahorro y regla 50/30/20. Todo local y privado.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0A0A0F",
+  "theme_color": "#0A0A0F",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
