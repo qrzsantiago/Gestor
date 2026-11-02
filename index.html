@@ -72,7 +72,7 @@
     style="padding-top:calc(env(safe-area-inset-top) + 14px); padding-bottom:calc(env(safe-area-inset-bottom) + 14px); padding-left:env(safe-area-inset-left)">
     <div class="px-5 pb-5 flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 grid place-items-center text-zinc-950"><i data-lucide="chart-no-axes-combined" class="w-5 h-5"></i></div>
-      <div><div class="font-semibold leading-tight">Gestor</div><div class="text-xs text-zinc-500">Finanzas e inventario</div></div>
+      <div><div class="font-semibold leading-tight">Gestor</div><div class="text-xs text-zinc-500">Finanzas e inventario · <span id="verTag"></span></div></div>
     </div>
     <div id="drawerItems" class="flex-1 overflow-y-auto px-3 space-y-0.5"></div>
   </nav>
@@ -89,7 +89,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.1';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -134,12 +134,12 @@ const dayWord = d => d < 0 ? `hace ${-d} d` : d === 0 ? 'hoy' : d === 1 ? 'maña
    ========================================================= */
 const COLLS = ['accounts','products','clients','sales','credits','payments','expenses','categories','cards','debts'];
 function blank() {
-  return { version: 2, accounts: [], products: [], clients: [], sales: [], credits: [], payments: [], expenses: [], categories: [], cards: [], debts: [], settings: { lowStock: '', defaultAccount: '', lastBackup: '' } };
+  return { version: 2, accounts: [], products: [], clients: [], sales: [], credits: [], payments: [], expenses: [], categories: [], cards: [], debts: [], settings: { lowStock: '', defaultAccount: '', lastBackup: '', demoChecked: true } };
 }
 function normalize(d) {
   const b = blank();
   COLLS.forEach(k => { if (!Array.isArray(d[k])) d[k] = []; });
-  d.settings = Object.assign({}, b.settings, d.settings || {});
+  d.settings = Object.assign({}, b.settings, { demoChecked: false }, d.settings || {});
   // Migración desde versión anterior
   d.products.forEach(p => { delete p.cost; delete p.price; });
   d.sales.forEach(s => { delete s.unitCost; delete s.unitPrice; });
@@ -160,7 +160,39 @@ function normalize(d) {
     delete e.category;
   });
   d.version = 2;
+  cleanLegacyDemo(d);
   return d;
+}
+/* Elimina únicamente los registros de ejemplo que creaba la versión 1 (coincidencia exacta)
+   y la cuenta "Efectivo" que la v1 creaba automáticamente si nunca se usó. Se ejecuta una sola vez. */
+let legacyRemoved = 0;
+function cleanLegacyDemo(d) {
+  if (d.settings.demoChecked) return;
+  d.settings.demoChecked = true;
+  let n = 0;
+  const rm = (k, pred) => { const b = d[k].length; d[k] = d[k].filter(x => !pred(x)); n += b - d[k].length; };
+  const DEMO_PROD = { 'iPhone 13 128GB': 4, 'AirPods Pro 2': 6, 'Funda MagSafe': 25, 'Cargador 20W': 3 };
+  const DEMO_CLI = { 'Juan Pérez': '55 1234 5678', 'María López': '55 8765 4321' };
+  const DEMO_EXP = [['Metro y camión', 45], ['Comida corrida', 120], ['Bolsas y empaques', 260], ['Café', 55], ['Uber', 98], ['Spotify', 129]];
+  const cardIds = new Set(d.cards.filter(c => (c.name === 'Nu' && c.color === 'violet' && +c.limit === 25000 && +c.msi === 3200) || (c.name === 'Openbank' && c.color === 'rose' && +c.limit === 40000)).map(c => c.id));
+  const prodIds = new Set(d.products.filter(p => DEMO_PROD[p.name] !== undefined && +p.base === DEMO_PROD[p.name]).map(p => p.id));
+  const cliIds = new Set(d.clients.filter(c => DEMO_CLI[c.name] !== undefined && DEMO_CLI[c.name] === c.phone).map(c => c.id));
+  const credIds = new Set(d.credits.filter(c => cliIds.has(c.clientId)).map(c => c.id));
+  const saleIds = new Set(d.sales.filter(s => prodIds.has(s.productId) || d.credits.some(c => credIds.has(c.id) && c.saleId === s.id)).map(s => s.id));
+  rm('payments', p => credIds.has(p.targetId) || cardIds.has(p.targetId));
+  rm('credits', c => credIds.has(c.id) || saleIds.has(c.saleId));
+  rm('sales', s => saleIds.has(s.id));
+  rm('expenses', e => cardIds.has(e.cardId) || DEMO_EXP.some(([t, a]) => e.concept === t && +e.amount === a));
+  rm('cards', c => cardIds.has(c.id));
+  rm('products', p => prodIds.has(p.id));
+  rm('clients', c => cliIds.has(c.id) && !d.sales.some(s => s.clientId === c.id) && !d.credits.some(x => x.clientId === c.id));
+  rm('debts', x => x.creditor === 'Proveedor CDMX' && +x.amount === 6000 && x.concept === 'Mercancía a crédito');
+  rm('categories', c => ['Pasajes', 'Comida', 'Insumos', 'Servicios'].includes(c.name) && !d.expenses.some(e => e.categoryId === c.id));
+  const used = id => ['sales', 'payments', 'expenses', 'credits', 'debts'].some(k => d[k].some(r => r.accountId === id));
+  rm('accounts', a => (a.name === 'BBVA Débito' && a.type === 'debito' && +a.base === 12000 && !used(a.id)) || (a.name === 'Efectivo' && a.type === 'efectivo' && [0, 2500].includes(+a.base || 0) && !used(a.id)));
+  if (d.settings.defaultAccount && !d.accounts.some(a => a.id === d.settings.defaultAccount)) d.settings.defaultAccount = '';
+  if (+d.settings.lowStock === 3) d.settings.lowStock = '';
+  legacyRemoved += n;
 }
 function load() { try { const d = JSON.parse(localStorage.getItem(LS)); if (d && typeof d === 'object') return normalize(d); } catch (e) {} return blank(); }
 let S = load();
@@ -793,7 +825,7 @@ R.ajustes = () => {
   h += box(`<div class="p-4 text-sm text-zinc-400 leading-relaxed">${standalone ? `<div class="flex items-center gap-2 text-emerald-400">${icon('circle-check', 'w-4 h-4')}Ejecutándose como app a pantalla completa.</div>` : `<ol class="list-decimal pl-5 space-y-1"><li>Abre esta página en <b class="text-zinc-200">Safari</b>.</li><li>Toca <b class="text-zinc-200">Compartir</b> ${icon('share', 'w-4 h-4 inline -mt-1')}.</li><li>Elige <b class="text-zinc-200">Agregar a pantalla de inicio</b>.</li></ol>`}</div>`);
   h += secTitle('Zona de riesgo');
   h += box(`<div class="p-4">${btn('Borrar todos los datos', 'wipe', 'trash-2', '', 'danger')}</div>`);
-  h += `<p class="text-center text-[11px] text-zinc-600 mt-8">Gestor · v2.0 · Pesos Mexicanos (MXN)</p>`;
+  h += `<p class="text-center text-[11px] text-zinc-600 mt-8">Gestor · versión ${APP_VERSION} · Pesos Mexicanos (MXN)</p>`;
   return h;
 };
 
@@ -1368,8 +1400,14 @@ $('#importFile').addEventListener('change', async e => { const file = e.target.f
 /* =========================================================
    INICIO
    ========================================================= */
-if (localStorage.getItem(LS)) persist();
+$('#verTag').textContent = 'v' + APP_VERSION;
+const hadData = !!localStorage.getItem(LS);
+const updated = hadData && S.settings.seenVersion !== APP_VERSION;
+S.settings.seenVersion = APP_VERSION;
+if (hadData) persist();
+if (!['dashboard', 'tarjetas', 'inventario', 'ventas', 'clientes', 'creditos', 'gastos', 'deudas', 'movimientos', 'ajustes'].includes(UI.view)) UI.view = 'dashboard';
 renderAll();
+if (updated) toast(legacyRemoved ? `Actualizado a la versión ${APP_VERSION} · ${legacyRemoved} registros de ejemplo eliminados` : `Actualizado a la versión ${APP_VERSION}`);
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !sheets.length) renderAll(); });
 </script>
 </body>
