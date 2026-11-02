@@ -40,6 +40,11 @@
   .fade-in { animation: fadeIn .2s ease; }
   .pop { animation: pop .18s ease; }
   .view-in { animation: fadeIn .18s ease; }
+  /* Casillas de segmentos (selección múltiple con puntito) */
+  .segc:checked + .segv { border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.12); color: #d1fae5; }
+  .segc:checked + .segv .segdot { border-color: #34d399; }
+  .segc:checked + .segv .segdot::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: #34d399; }
+  .segc:focus-visible + .segv { outline: 2px solid rgba(52,211,153,.6); outline-offset: 2px; }
 </style>
 </head>
 <body class="bg-zinc-950 text-zinc-100 font-sans antialiased">
@@ -89,7 +94,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.1';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.2';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -132,9 +137,9 @@ const dayWord = d => d < 0 ? `hace ${-d} d` : d === 0 ? 'hoy' : d === 1 ? 'maña
 /* =========================================================
    DATOS (sin datos precargados)
    ========================================================= */
-const COLLS = ['accounts','products','clients','sales','credits','payments','expenses','categories','cards','debts'];
+const COLLS = ['accounts','products','clients','sales','credits','payments','expenses','segments','cards','debts'];
 function blank() {
-  return { version: 2, accounts: [], products: [], clients: [], sales: [], credits: [], payments: [], expenses: [], categories: [], cards: [], debts: [], settings: { lowStock: '', defaultAccount: '', lastBackup: '', demoChecked: true } };
+  return { version: 2, accounts: [], products: [], clients: [], sales: [], credits: [], payments: [], expenses: [], segments: [], cards: [], debts: [], settings: { lowStock: '', defaultAccount: '', lastBackup: '', demoChecked: true } };
 }
 function normalize(d) {
   const b = blank();
@@ -151,14 +156,26 @@ function normalize(d) {
   d.cards.forEach(c => {
     if (c.periodBase === undefined) { c.periodBase = +c.base || 0; c.nextBase = 0; c.nextDate = ''; c.other = 0; delete c.base; }
   });
+  // Categorías (v2) → Segmentos de selección múltiple (v2.2). Cada movimiento puede tener varios segmentos.
+  const cats = Array.isArray(d.categories) ? d.categories : [];
   d.expenses.forEach(e => {
-    if (e.categoryId === undefined) {
-      const name = (e.category || '').trim();
-      if (name) { let c = d.categories.find(x => x.name.toLowerCase() === name.toLowerCase()); if (!c) { c = { id: uid(), name, recur: '' }; d.categories.push(c); } e.categoryId = c.id; }
-      else e.categoryId = null;
+    if (!Array.isArray(e.segmentIds)) {
+      let ids = [];
+      if (e.categoryId) ids = [e.categoryId];
+      else if ((e.category || '').trim()) {
+        const name = e.category.trim();
+        let c = cats.find(x => x.name.toLowerCase() === name.toLowerCase());
+        if (!c) { c = { id: uid(), name }; cats.push(c); }
+        ids = [c.id];
+      }
+      e.segmentIds = ids;
     }
-    delete e.category;
+    delete e.categoryId; delete e.category;
+    if (e.type !== 'ingreso') e.type = 'gasto';
+    if (e.type === 'ingreso') e.cardId = null;
   });
+  cats.forEach(c => { if (!d.segments.some(x => x.id === c.id)) d.segments.push({ id: c.id, name: c.name, createdAt: c.createdAt || Date.now() }); });
+  delete d.categories;
   d.version = 2;
   cleanLegacyDemo(d);
   return d;
@@ -187,7 +204,7 @@ function cleanLegacyDemo(d) {
   rm('products', p => prodIds.has(p.id));
   rm('clients', c => cliIds.has(c.id) && !d.sales.some(s => s.clientId === c.id) && !d.credits.some(x => x.clientId === c.id));
   rm('debts', x => x.creditor === 'Proveedor CDMX' && +x.amount === 6000 && x.concept === 'Mercancía a crédito');
-  rm('categories', c => ['Pasajes', 'Comida', 'Insumos', 'Servicios'].includes(c.name) && !d.expenses.some(e => e.categoryId === c.id));
+  rm('segments', c => ['Pasajes', 'Comida', 'Insumos', 'Servicios'].includes(c.name) && !d.expenses.some(e => (e.segmentIds || []).includes(c.id)));
   const used = id => ['sales', 'payments', 'expenses', 'credits', 'debts'].some(k => d[k].some(r => r.accountId === id));
   rm('accounts', a => (a.name === 'BBVA Débito' && a.type === 'debito' && +a.base === 12000 && !used(a.id)) || (a.name === 'Efectivo' && a.type === 'efectivo' && [0, 2500].includes(+a.base || 0) && !used(a.id)));
   if (d.settings.defaultAccount && !d.accounts.some(a => a.id === d.settings.defaultAccount)) d.settings.defaultAccount = '';
@@ -197,14 +214,16 @@ function cleanLegacyDemo(d) {
 function load() { try { const d = JSON.parse(localStorage.getItem(LS)); if (d && typeof d === 'object') return normalize(d); } catch (e) {} return blank(); }
 let S = load();
 let UI = Object.assign({ view: 'dashboard', credF: 'activos', movF: 'todos', movLimit: 60,
-  dashP: 'semana', dashO: 0, salesP: 'historico', salesO: 0, expP: 'semana', expO: 0 }, (() => { try { return JSON.parse(localStorage.getItem(LSUI)) || {}; } catch (e) { return {}; } })());
+  segF: '', dashP: 'semana', dashO: 0, salesP: 'historico', salesO: 0, expP: 'semana', expO: 0 }, (() => { try { return JSON.parse(localStorage.getItem(LSUI)) || {}; } catch (e) { return {}; } })());
 UI.movLimit = 60;
 function persist() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) { toast('No se pudo guardar (almacenamiento lleno)', 'error'); } }
 function saveUI() { try { localStorage.setItem(LSUI, JSON.stringify(UI)); } catch (e) {} }
 
 const accName = id => byId(S.accounts, id)?.name || '';
 const cliName = id => byId(S.clients, id)?.name || '';
-const catName = id => byId(S.categories, id)?.name || '';
+const isInc = e => e.type === 'ingreso';
+const segNames = ids => (ids || []).map(id => byId(S.segments, id)?.name).filter(Boolean);
+const signed = n => (n > 0.005 ? '+' : n < -0.005 ? '−' : '') + fmt(Math.abs(n));
 const defaultAcc = () => byId(S.accounts, S.settings.defaultAccount) ? S.settings.defaultAccount : '';
 const lowStock = () => Math.max(0, parseInt(S.settings.lowStock) || 0);
 
@@ -256,7 +275,7 @@ function debtInfo(d) {
 function cardInfo(c) {
   const T = T0(), cutDay = validDay(c.cutDay) || 1, dueDay = validDay(c.dueDay) || 1;
   const lastCut = toISO(lastOnOrBefore(cutDay, T));
-  const exps = S.expenses.filter(e => e.cardId === c.id);
+  const exps = S.expenses.filter(e => e.cardId === c.id && !isInc(e));
   const charges = [...exps.map(e => ({ date: e.date, amount: +e.amount || 0 })), ...((+c.nextBase || 0) ? [{ date: c.nextDate || '0000-00-00', amount: +c.nextBase }] : [])];
   const closed = sum(charges.filter(x => x.date <= lastCut), x => x.amount), open = sum(charges.filter(x => x.date > lastCut), x => x.amount);
   const pay = sum(paysFor('card', c.id), p => p.amount);
@@ -277,7 +296,8 @@ function accFlows(a) {
   f += sum(S.sales.filter(s => s.pay === 'contado' && s.accountId === id), s => s.total);
   f += sum(S.payments.filter(p => p.kind === 'credit' && p.accountId === id), p => p.amount);
   f -= sum(S.payments.filter(p => p.kind !== 'credit' && p.accountId === id), p => p.amount);
-  f -= sum(S.expenses.filter(e => !e.cardId && e.accountId === id), e => e.amount);
+  f -= sum(S.expenses.filter(e => !isInc(e) && !e.cardId && e.accountId === id), e => e.amount);
+  f += sum(S.expenses.filter(e => isInc(e) && e.accountId === id), e => e.amount);
   f -= sum(S.credits.filter(c => c.type === 'prestamo' && c.accountId === id), c => c.principal);
   f += sum(S.debts.filter(d => d.accountId === id), d => d.amount);
   return r2(f);
@@ -303,17 +323,19 @@ function range(p, off) {
   return { start: toISO(s), end: toISO(e), label, days: Math.max(1, daysBetween(s, endEff) + 1) };
 }
 const inRange = (d, r) => !r.start || (d >= r.start && d <= r.end);
-const RECUR = { semana: 'Semanal', quincena: 'Quincenal', mes: 'Mensual' };
-const RECUR_NOW = { semana: 'esta semana', quincena: 'esta quincena', mes: 'este mes' };
 
 function ledger() {
   const L = [];
   S.sales.forEach(s => L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, title: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`,
     sub: ['Venta', cliName(s.clientId), s.pay === 'credito' ? 'A crédito' : accName(s.accountId)].filter(Boolean).join(' · '),
     amount: s.total, sign: s.pay === 'credito' || !s.accountId ? 0 : 1, acc: s.accountId, client: s.clientId, icon: 'shopping-bag', tone: 'bg-emerald-500/10 text-emerald-400', type: 'ventas' }));
-  S.expenses.forEach(e => { const card = byId(S.cards, e.cardId);
-    L.push({ t: 'expense', id: e.id, date: e.date, cr: e.createdAt || 0, title: e.concept || catName(e.categoryId) || 'Gasto', sub: ['Gasto', e.concept ? catName(e.categoryId) : '', card ? card.name : accName(e.accountId)].filter(Boolean).join(' · '),
-      amount: e.amount, sign: -1, acc: e.cardId ? null : e.accountId, card: e.cardId, cat: e.categoryId, icon: 'receipt', tone: 'bg-rose-500/10 text-rose-400', type: 'gastos' }); });
+  S.expenses.forEach(e => {
+    const inc = isInc(e), card = inc ? null : byId(S.cards, e.cardId), segs = segNames(e.segmentIds).join(', ');
+    L.push({ t: 'expense', id: e.id, date: e.date, cr: e.createdAt || 0, title: e.concept || segs || (inc ? 'Ingreso' : 'Gasto'),
+      sub: [inc ? 'Ingreso' : 'Gasto', e.concept ? segs : '', card ? card.name : accName(e.accountId)].filter(Boolean).join(' · '),
+      amount: e.amount, sign: inc ? 1 : -1, acc: card ? null : e.accountId, card: card ? e.cardId : null, segs: e.segmentIds || [],
+      icon: inc ? 'arrow-down-left' : 'receipt', tone: inc ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400', type: inc ? 'ingresos' : 'gastos' });
+  });
   S.payments.forEach(p => {
     let title = 'Abono', sub = '', icon = 'hand-coins', tone = 'bg-sky-500/10 text-sky-400', sign = 1, client = null;
     if (p.kind === 'credit') { const c = byId(S.credits, p.targetId); client = c?.clientId; title = `Abono · ${cliName(c?.clientId) || 'Cliente'}`; sub = c ? creditConcept(c) : ''; sign = p.accountId ? 1 : 0; }
@@ -542,7 +564,7 @@ const VIEWS = [
   ['ventas', 'Ventas', 'shopping-bag'],
   ['clientes', 'Clientes', 'users'],
   ['creditos', 'Créditos y Préstamos', 'hand-coins'],
-  ['gastos', 'Gastos', 'receipt'],
+  ['gastos', 'Ingresos y Gastos', 'arrow-up-down'],
   ['deudas', 'Mis Deudas', 'landmark'],
   ['movimientos', 'Movimientos', 'arrow-left-right'],
   ['ajustes', 'Respaldo y Ajustes', 'settings'],
@@ -598,7 +620,8 @@ function formChanged(e) { const f = $('#sheetForm'); if (!f || !f.contains(e.tar
 const isPick = t => t.tagName === 'SELECT' || t.type === 'radio' || t.type === 'date' || t.type === 'checkbox';
 sheetRoot.addEventListener('input', e => { if (!isPick(e.target)) formChanged(e); });
 sheetRoot.addEventListener('change', e => { if (isPick(e.target)) formChanged(e); });
-sheetRoot.addEventListener('focusin', e => { const t = e.target; if (t.hasAttribute && t.hasAttribute('data-money') && t.value) t.value = String(num(t.value)); });
+sheetRoot.addEventListener('keydown', e => { if (e.key === 'Enter' && e.target.name === 'newSeg') { e.preventDefault(); A.addSegInline(); } });
+sheetRoot.addEventListener('focusin', e => { const t = e.target; if (t.hasAttribute && t.hasAttribute('data-money') && t.value.includes(',')) t.value = t.value.replace(/,/g, ''); });
 sheetRoot.addEventListener('focusout', e => { const t = e.target; if (t.hasAttribute && t.hasAttribute('data-money') && t.value.trim() !== '') t.value = fmtN(num(t.value)); });
 
 /* =========================================================
@@ -752,34 +775,52 @@ R.creditos = () => {
 
 R.gastos = () => {
   const r = range(UI.expP, UI.expO);
-  const L = S.expenses.filter(e => inRange(e.date, r));
-  const total = sum(L, e => e.amount);
+  if (UI.segF && UI.segF !== '__none' && !byId(S.segments, UI.segF)) UI.segF = '';
+  const f = UI.segF || '';
+  const inSeg = e => !f || (f === '__none' ? !(e.segmentIds || []).length : (e.segmentIds || []).includes(f));
+  const P = S.expenses.filter(e => inRange(e.date, r));
+  const L = P.filter(inSeg);
+  const inc = sum(L.filter(isInc), e => e.amount), out = sum(L.filter(e => !isInc(e)), e => e.amount), net = r2(inc - out);
+  const segLabel = !f ? 'Todos los movimientos' : f === '__none' ? 'Sin segmento' : byId(S.segments, f).name;
   let h = periodBar('exp');
+  const hasNone = S.expenses.some(e => !(e.segmentIds || []).length);
+  if (S.segments.length) h += `<div class="mt-3">${chips([['', 'Todos'], ...[...S.segments].sort(byName).map(x => [x.id, esc(x.name)]), ...(hasNone ? [['__none', 'Sin segmento']] : [])], f, 'setUI', 'segF')}</div>`;
+  // Balance del período: ingresos frente a gastos
   h += `<div class="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
-    <div class="text-[12px] text-zinc-400">Total de gastos · ${esc(r.label)}</div>
-    <div class="text-[30px] font-semibold tabular-nums tracking-tight text-rose-400 mt-0.5">${fmt(total)}</div>
-    <div class="flex gap-4 mt-1 text-xs text-zinc-500"><span>${L.length} registro${L.length !== 1 ? 's' : ''}</span>${r.days && L.length ? `<span>Promedio diario ${fmt(total / r.days)}</span>` : ''}</div>`;
-  if (L.length) {
-    const cats = {}; L.forEach(e => { const k = e.categoryId || ''; cats[k] = (cats[k] || 0) + (+e.amount || 0); });
-    h += `<div class="mt-4 space-y-3">${Object.entries(cats).sort((a, b) => b[1] - a[1]).map(([k, v]) => `<div><div class="flex justify-between text-[13px] mb-1.5"><span class="text-zinc-300 truncate">${esc(catName(k) || 'Sin categoría')}</span><span class="tabular-nums text-zinc-400 shrink-0 ml-3">${fmt(v)} · ${(total ? v / total * 100 : 0).toFixed(0)}%</span></div>${progress(total ? v / total * 100 : 0, 'bg-rose-500/70')}</div>`).join('')}</div>`;
-  }
-  h += `</div>`;
-  // Categorías propias del usuario
-  h += secTitle('Mis categorías', btn('Categoría', 'newCategory', 'plus', '', 'ghost'));
-  if (S.categories.length) {
-    h += listBox([...S.categories].sort(byName).map(c => {
-      let info = '';
-      if (RECUR[c.recur]) { const rr = range(c.recur, 0), sp = sum(S.expenses.filter(e => e.categoryId === c.id && inRange(e.date, rr)), e => e.amount); info = sp > 0 ? `${fmt(sp)} ${RECUR_NOW[c.recur]}` : `Sin registros ${RECUR_NOW[c.recur]}`; }
-      else { const sp = sum(L.filter(e => e.categoryId === c.id), e => e.amount); info = `${fmt(sp)} en el período`; }
-      return `<div class="flex items-center gap-3 px-3.5 py-3">
-        <button data-act="editCategory" data-id="${c.id}" class="flex-1 min-w-0 text-left"><span class="flex items-center gap-2"><span class="truncate">${esc(c.name)}</span>${RECUR[c.recur] ? badge(RECUR[c.recur], 'info') : ''}</span><span class="block text-xs text-zinc-500 truncate mt-0.5 tabular-nums">${info}</span></button>
-        <button data-act="newExpense" data-cat="${c.id}" aria-label="Registrar gasto" class="w-9 h-9 shrink-0 rounded-lg grid place-items-center bg-zinc-800 text-zinc-300">${icon('plus', 'w-4 h-4')}</button>
+    <div class="text-[12px] text-zinc-400 truncate">${esc(segLabel)} · ${esc(r.label)}</div>
+    <div class="text-[32px] leading-tight font-semibold tabular-nums tracking-tight mt-1 ${net > 0.005 ? 'text-emerald-400' : net < -0.005 ? 'text-rose-400' : ''}">${signed(net)}</div>
+    <div class="text-[13px] mt-0.5 ${net >= 0 ? 'text-emerald-300/80' : 'text-rose-300/90'}">${!L.length ? 'Sin movimientos en este período' : net > 0.005 ? `Sobraron ${fmt(net)}` : net < -0.005 ? `Los gastos superaron los ingresos por ${fmt(-net)}` : 'Ingresos y gastos están parejos'}</div>
+    <div class="grid grid-cols-2 gap-2 mt-4">
+      <div class="rounded-xl border border-emerald-500/20 bg-emerald-500/[.06] p-3 min-w-0"><div class="text-[11px] text-emerald-300/80">Ingresos</div><div class="font-semibold tabular-nums text-emerald-400 truncate">+${fmt(inc)}</div></div>
+      <div class="rounded-xl border border-rose-500/20 bg-rose-500/[.06] p-3 min-w-0"><div class="text-[11px] text-rose-300/80">Gastos</div><div class="font-semibold tabular-nums text-rose-400 truncate">−${fmt(out)}</div></div>
+    </div>
+    ${inc > 0 ? `<div class="mt-3">${progress(out / inc * 100, out > inc ? 'bg-rose-500' : 'bg-emerald-500')}<div class="text-[11px] text-zinc-500 mt-1.5">Gastado ${Math.round(out / inc * 100)}% de los ingresos</div></div>` : ''}
+  </div>`;
+  const segData = f && f !== '__none' ? `data-seg="${f}"` : '';
+  h += `<div class="grid grid-cols-2 gap-2 mt-3">
+    <button data-act="newMov" data-type="ingreso" ${segData} class="h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold inline-flex items-center justify-center gap-2 active:opacity-80"><span class="text-xl leading-none">+</span>Ingreso</button>
+    <button data-act="newMov" data-type="gasto" ${segData} class="h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold inline-flex items-center justify-center gap-2 active:opacity-80"><span class="text-xl leading-none">−</span>Gasto</button>
+  </div>`;
+  // Segmentos: un mismo movimiento cuenta en cada segmento marcado
+  h += secTitle('Segmentos', btn('Segmento', 'newSegment', 'plus', '', 'ghost'));
+  if (S.segments.length) {
+    h += listBox([...S.segments].sort(byName).map(x => {
+      const M = P.filter(e => (e.segmentIds || []).includes(x.id));
+      const si = sum(M.filter(isInc), e => e.amount), so = sum(M.filter(e => !isInc(e)), e => e.amount), sn = r2(si - so);
+      return `<div class="flex items-center gap-2 pl-3.5 pr-2 py-3 ${f === x.id ? 'bg-zinc-800/60' : ''}">
+        <button data-act="setUI" data-k="segF" data-v="${f === x.id ? '' : x.id}" class="flex-1 min-w-0 text-left">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 shrink-0 rounded-full ${f === x.id ? 'bg-emerald-400' : 'bg-zinc-600'}"></span><span class="truncate">${esc(x.name)}</span><span class="text-[11px] text-zinc-500 shrink-0">${M.length} mov.</span></span>
+          <span class="block text-xs tabular-nums mt-0.5 truncate"><span class="text-emerald-400">+${fmt(si)}</span> <span class="text-zinc-600">·</span> <span class="text-rose-400">−${fmt(so)}</span></span>
+        </button>
+        <span class="font-semibold tabular-nums text-sm shrink-0 ${sn > 0.005 ? 'text-emerald-400' : sn < -0.005 ? 'text-rose-400' : 'text-zinc-400'}">${signed(sn)}</span>
+        <button data-act="editSegment" data-id="${x.id}" aria-label="Editar segmento" class="w-9 h-9 shrink-0 rounded-lg grid place-items-center text-zinc-500 active:bg-zinc-800">${icon('pencil', 'w-4 h-4')}</button>
       </div>`;
     }).join(''));
-  } else h += empty('tags', 'Sin categorías creadas.');
-  h += `<div class="flex items-center justify-between mt-8 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Registros</h2>${btn('Nuevo gasto', 'newExpense')}</div>`;
-  const LL = ledger().filter(x => x.t === 'expense' && inRange(x.date, r));
-  h += LL.length ? groupedLedger(LL) : empty('receipt', 'Sin gastos en este período.');
+    h += `<div class="text-[11px] text-zinc-500 mt-2 px-1">Totales del período. Un movimiento con varios segmentos suma en cada uno.</div>`;
+  } else h += empty('tags', 'Sin segmentos creados.');
+  h += secTitle(f ? `Registros · ${esc(segLabel)}` : 'Registros');
+  const LL = ledger().filter(x => x.t === 'expense' && inRange(x.date, r) && inSeg(byId(S.expenses, x.id)));
+  h += LL.length ? groupedLedger(LL) : empty('arrow-up-down', 'Sin movimientos en este período.');
   return h;
 };
 
@@ -800,7 +841,7 @@ R.deudas = () => {
 R.movimientos = () => {
   const f = UI.movF;
   const L = ledger().filter(x => f === 'todos' || x.type === f);
-  let h = chips([['todos', 'Todos'], ['ventas', 'Ventas'], ['gastos', 'Gastos'], ['abonos', 'Abonos'], ['prestamos', 'Préstamos']], f, 'setUI', 'movF');
+  let h = chips([['todos', 'Todos'], ['ventas', 'Ventas'], ['ingresos', 'Ingresos'], ['gastos', 'Gastos'], ['abonos', 'Abonos'], ['prestamos', 'Préstamos']], f, 'setUI', 'movF');
   h += `<div class="flex mt-3 mb-4">${searchBox('movList', 'Buscar')}</div>`;
   if (!L.length) return h + empty('arrow-left-right', 'Sin movimientos registrados.');
   h += groupedLedger(L.slice(0, UI.movLimit), 'movList');
@@ -843,7 +884,7 @@ function renderAll() {
 function openQuick() {
   const tile = (v, l, ic, cls) => `<button type="button" data-act="quick" data-v="${v}" class="rounded-2xl p-4 border border-zinc-800 bg-zinc-950/60 active:scale-[.97] transition text-center"><span class="w-12 h-12 mx-auto rounded-2xl grid place-items-center ${cls}">${icon(ic, 'w-6 h-6')}</span><span class="block mt-2 font-semibold text-sm">${l}</span></button>`;
   const mini = (v, l, ic) => `<button type="button" data-act="quick" data-v="${v}" class="flex items-center gap-2.5 h-12 px-3 rounded-xl border border-zinc-800 bg-zinc-950/40 text-[13px] text-zinc-300 active:bg-zinc-800">${icon(ic, 'w-4 h-4 text-zinc-500')}${l}</button>`;
-  openSheet({ title: 'Registro rápido', body: () => `<div class="grid grid-cols-3 gap-3">${tile('sale', 'Venta', 'shopping-bag', 'bg-emerald-500/15 text-emerald-400')}${tile('expense', 'Gasto', 'receipt', 'bg-rose-500/15 text-rose-400')}${tile('pay', 'Abono', 'hand-coins', 'bg-sky-500/15 text-sky-400')}</div>
+  openSheet({ title: 'Registro rápido', body: () => `<div class="grid grid-cols-2 gap-3">${tile('sale', 'Venta', 'shopping-bag', 'bg-zinc-800 text-zinc-200')}${tile('pay', 'Abono', 'hand-coins', 'bg-sky-500/15 text-sky-400')}${tile('income', '+ Ingreso', 'arrow-down-left', 'bg-emerald-500/15 text-emerald-400')}${tile('expense', '− Gasto', 'receipt', 'bg-rose-500/15 text-rose-400')}</div>
     <div class="grid grid-cols-2 gap-2 mt-3 mb-2">${mini('credit', 'Crédito / préstamo', 'handshake')}${mini('debt', 'Deuda propia', 'landmark')}${mini('product', 'Producto', 'package-plus')}${mini('client', 'Cliente', 'user-plus')}</div>` });
 }
 
@@ -1029,61 +1070,84 @@ function payForm(id, preset = {}) {
   });
 }
 
-function methodOpts() {
-  return [{ v: '', l: 'Sin especificar (no afecta saldos)' }, ...S.accounts.map(a => ({ v: 'acc:' + a.id, l: a.name, g: 'Cuentas' })), ...S.cards.map(c => ({ v: 'card:' + c.id, l: c.name, g: 'Tarjetas de crédito' }))];
+function methodOptsG() { return [{ v: '', l: 'Sin especificar (no afecta saldos)' }, ...S.accounts.map(a => ({ v: 'acc:' + a.id, l: a.name, g: 'Cuentas' })), ...S.cards.map(c => ({ v: 'card:' + c.id, l: c.name, g: 'Tarjetas de crédito' }))]; }
+function methodOptsI() { return [{ v: '', l: 'Sin especificar (no afecta saldos)' }, ...S.accounts.map(a => ({ v: 'acc:' + a.id, l: a.name }))]; }
+function segChip(v, label, checked) {
+  return `<label class="block"><input type="checkbox" name="seg" value="${esc(v)}" ${checked ? 'checked' : ''} class="segc sr-only"><span class="segv inline-flex items-center gap-2 h-9 pl-2.5 pr-3.5 rounded-full border border-zinc-800 bg-zinc-950 text-[13px] text-zinc-400 transition"><span class="segdot w-4 h-4 shrink-0 rounded-full border border-zinc-600 grid place-items-center"></span><span class="truncate max-w-[180px]">${esc(label)}</span></span></label>`;
 }
-function catOpts() { return [{ v: '', l: 'Sin categoría' }, ...[...S.categories].sort(byName).map(c => ({ v: c.id, l: c.name + (RECUR[c.recur] ? ` · ${RECUR[c.recur]}` : '') })), { v: '__new', l: '+ Nueva categoría' }]; }
-function expForm(id, preset = {}) {
+function typeToggle(v) {
+  return `<div class="grid grid-cols-2 gap-2">
+    <label class="block"><input type="radio" name="type" value="ingreso" ${v === 'ingreso' ? 'checked' : ''} class="peer sr-only"><span class="flex items-center justify-center gap-2 h-12 rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-400 font-semibold transition peer-checked:bg-emerald-500/15 peer-checked:border-emerald-500/60 peer-checked:text-emerald-300"><span class="text-xl leading-none">+</span>Ingreso</span></label>
+    <label class="block"><input type="radio" name="type" value="gasto" ${v === 'gasto' ? 'checked' : ''} class="peer sr-only"><span class="flex items-center justify-center gap-2 h-12 rounded-xl border border-zinc-800 bg-zinc-950 text-zinc-400 font-semibold transition peer-checked:bg-rose-500/15 peer-checked:border-rose-500/60 peer-checked:text-rose-300"><span class="text-xl leading-none">−</span>Gasto</span></label>
+  </div>`;
+}
+function movForm(id, preset = {}) {
   const x = id ? byId(S.expenses, id) : null;
-  const method = x ? (x.cardId ? 'card:' + x.cardId : x.accountId ? 'acc:' + x.accountId : '') : (preset.cardId ? 'card:' + preset.cardId : (defaultAcc() ? 'acc:' + defaultAcc() : ''));
+  const type = x ? x.type : (preset.type || '');
+  const selSegs = x ? (x.segmentIds || []) : (preset.segId ? [preset.segId] : []);
+  const mG = x && !isInc(x) ? (x.cardId ? 'card:' + x.cardId : x.accountId ? 'acc:' + x.accountId : '') : (preset.cardId ? 'card:' + preset.cardId : (defaultAcc() ? 'acc:' + defaultAcc() : ''));
+  const mI = x && isInc(x) ? (x.accountId ? 'acc:' + x.accountId : '') : (defaultAcc() ? 'acc:' + defaultAcc() : '');
   openSheet({
-    title: x ? 'Editar gasto' : 'Nuevo gasto', submit: x ? 'Guardar cambios' : 'Registrar gasto', exists: () => !id || !!byId(S.expenses, id), focus: x ? null : 'amount',
+    title: x ? 'Editar movimiento' : 'Nuevo movimiento', submit: x ? 'Guardar cambios' : 'Registrar', exists: () => !id || !!byId(S.expenses, id), focus: x || !type ? null : 'amount',
     body: () => `
-      ${fld('Monto', money('amount', x ? x.amount : ''))}
-      ${fld('Categoría', sel('categoryId', catOpts(), x ? (x.categoryId || '') : (preset.categoryId || '')))}
-      <div data-show="categoryId=__new" class="rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4 mb-4">
-        ${fld('Nombre de la nueva categoría', inp('newCat', ''))}
-        ${fld('Frecuencia (opcional)', seg('newRecur', [['semana', 'Semanal'], ['quincena', 'Quincenal'], ['mes', 'Mensual']], ''))}
-      </div>
+      ${fld('Tipo de movimiento', typeToggle(type))}
+      ${fld('Monto', `<div class="relative"><span id="amtSign" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 font-semibold pointer-events-none">$</span><input name="amount" value="${x ? fmtN(x.amount) : ''}" inputmode="decimal" autocomplete="off" data-money class="${inCls} pl-10 tabular-nums text-lg font-semibold"></div>`)}
+      ${fld('Segmentos <span class="text-zinc-600 font-normal">· puedes marcar varios</span>', `<div id="segBox" class="flex flex-wrap gap-2">${[...S.segments].sort(byName).map(sg => segChip(sg.id, sg.name, selSegs.includes(sg.id))).join('')}</div>
+        <div class="flex gap-2 ${S.segments.length ? 'mt-2.5' : ''}"><input name="newSeg" aria-label="Nuevo segmento" autocomplete="off" autocorrect="off" spellcheck="false" class="${inCls} h-10 flex-1 min-w-0"><button type="button" data-act="addSegInline" class="h-10 px-3.5 rounded-xl bg-zinc-800 text-sm font-semibold inline-flex items-center gap-1.5 shrink-0">${icon('plus', 'w-4 h-4')}Segmento</button></div>`)}
       ${fld('Concepto (opcional)', inp('concept', x?.concept || ''))}
-      ${fld('Pagado con', sel('method', methodOpts(), method))}
+      <div data-show="type=gasto">${fld('Pagado con', sel('methodG', methodOptsG(), mG))}</div>
+      <div data-show="type=ingreso">${fld('Entra a la cuenta', sel('methodI', methodOptsI(), mI))}</div>
       ${fld('Fecha', dateInp('date', x?.date || ''), x ? '' : 'Si la dejas vacía se registra con la fecha de hoy.')}
       ${fld('Notas (opcional)', inp('notes', x?.notes || ''))}`,
-    onSubmit(f) {
-      const amount = r2(num(f.amount)); if (amount <= 0) return err('Escribe el monto del gasto');
-      let categoryId = f.categoryId || null;
-      if (categoryId === '__new') {
-        const n = (f.newCat || '').trim(); if (!n) return err('Escribe el nombre de la nueva categoría');
-        let c = S.categories.find(k => k.name.toLowerCase() === n.toLowerCase());
-        if (!c) { c = { id: uid(), name: n, recur: RECUR[f.newRecur] ? f.newRecur : '', createdAt: Date.now() }; S.categories.push(c); }
-        categoryId = c.id;
-      }
-      const [mt, mid] = (f.method || '').split(':');
-      const rec = x || { id: uid(), createdAt: Date.now() };
-      Object.assign(rec, { amount, categoryId, concept: (f.concept || '').trim(), date: f.date || today(), accountId: mt === 'acc' ? mid : null, cardId: mt === 'card' ? mid : null, notes: (f.notes || '').trim() });
-      if (!x) S.expenses.push(rec);
-      return x ? 'Gasto actualizado' : `Gasto registrado · ${fmt(amount)}`;
+    onInput(f) {
+      const t = getVal(f, 'type'), sg = f.querySelector('#amtSign');
+      sg.textContent = t === 'ingreso' ? '+$' : t === 'gasto' ? '−$' : '$';
+      sg.className = `absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold pointer-events-none ${t === 'ingreso' ? 'text-emerald-400' : t === 'gasto' ? 'text-rose-400' : 'text-zinc-500'}`;
     },
-    onDelete: x ? async () => { if (!await confirmDlg('Eliminar gasto', `¿Eliminar el gasto de ${fmt(x.amount)}?`)) return false; S.expenses = S.expenses.filter(e => e.id !== x.id); } : null,
+    onSubmit(f, form) {
+      if (f.type !== 'ingreso' && f.type !== 'gasto') return err('Elige si es Ingreso o Gasto');
+      const amount = r2(num(f.amount)); if (amount <= 0) return err('Escribe el monto');
+      const vals = [...form.querySelectorAll('input[name=seg]:checked')].map(i => i.value);
+      if ((f.newSeg || '').trim()) vals.push('new:' + f.newSeg.trim());
+      const segmentIds = [];
+      for (const v of vals) {
+        let sid = v;
+        if (v.startsWith('new:')) {
+          const n = v.slice(4).trim(); if (!n) continue;
+          let sg = S.segments.find(k => k.name.toLowerCase() === n.toLowerCase());
+          if (!sg) { sg = { id: uid(), name: n, createdAt: Date.now() }; S.segments.push(sg); }
+          sid = sg.id;
+        } else if (!byId(S.segments, v)) continue;
+        if (!segmentIds.includes(sid)) segmentIds.push(sid);
+      }
+      const [mt, mid] = ((f.type === 'gasto' ? f.methodG : f.methodI) || '').split(':');
+      const rec = x || { id: uid(), createdAt: Date.now() };
+      Object.assign(rec, { type: f.type, amount, segmentIds, concept: (f.concept || '').trim(), date: f.date || today(),
+        accountId: mt === 'acc' ? mid : null, cardId: f.type === 'gasto' && mt === 'card' ? mid : null, notes: (f.notes || '').trim() });
+      if (!x) S.expenses.push(rec);
+      const lbl = f.type === 'ingreso' ? 'Ingreso' : 'Gasto';
+      return x ? `${lbl} actualizado` : `${lbl} registrado · ${f.type === 'ingreso' ? '+' : '−'}${fmt(amount)}`;
+    },
+    onDelete: x ? async () => { if (!await confirmDlg('Eliminar movimiento', `¿Eliminar el ${isInc(x) ? 'ingreso' : 'gasto'} de ${fmt(x.amount)}?`)) return false; S.expenses = S.expenses.filter(e => e.id !== x.id); } : null,
   });
 }
-function categoryForm(id) {
-  const c = id ? byId(S.categories, id) : null;
+function segmentForm(id) {
+  const g = id ? byId(S.segments, id) : null;
   openSheet({
-    title: c ? 'Editar categoría' : 'Nueva categoría', exists: () => !id || !!byId(S.categories, id), focus: c ? null : 'name',
-    body: () => `${fld('Nombre', inp('name', c?.name || ''))}
-      ${fld('Frecuencia (opcional)', seg('recur', [['semana', 'Semanal'], ['quincena', 'Quincenal'], ['mes', 'Mensual'], ['libre', 'Libre']], c ? (c.recur || 'libre') : ''))}`,
+    title: g ? 'Editar segmento' : 'Nuevo segmento', exists: () => !id || !!byId(S.segments, id), focus: g ? null : 'name',
+    body: () => `${fld('Nombre del segmento', inp('name', g?.name || ''))}${g ? `<div class="text-xs text-zinc-500 -mt-2 mb-4">${S.expenses.filter(e => (e.segmentIds || []).includes(g.id)).length} movimiento(s) marcados con este segmento.</div>` : ''}`,
     onSubmit(f) {
-      const name = (f.name || '').trim(); if (!name) return err('Escribe el nombre de la categoría');
-      if (S.categories.some(k => k.id !== c?.id && k.name.toLowerCase() === name.toLowerCase())) return err('Ya existe una categoría con ese nombre');
-      const rec = c || { id: uid(), createdAt: Date.now() };
-      Object.assign(rec, { name, recur: RECUR[f.recur] ? f.recur : '' });
-      if (!c) S.categories.push(rec); return c ? 'Categoría actualizada' : 'Categoría creada';
+      const name = (f.name || '').trim(); if (!name) return err('Escribe el nombre del segmento');
+      if (S.segments.some(k => k.id !== g?.id && k.name.toLowerCase() === name.toLowerCase())) return err('Ya existe un segmento con ese nombre');
+      const rec = g || { id: uid(), createdAt: Date.now() };
+      rec.name = name;
+      if (!g) S.segments.push(rec); return g ? 'Segmento actualizado' : 'Segmento creado';
     },
-    onDelete: c ? async () => {
-      const n = S.expenses.filter(e => e.categoryId === c.id).length;
-      if (!await confirmDlg('Eliminar categoría', `¿Eliminar "${c.name}"?${n ? ` ${n} gasto(s) quedarán sin categoría.` : ''}`)) return false;
-      S.categories = S.categories.filter(k => k.id !== c.id); S.expenses.forEach(e => { if (e.categoryId === c.id) e.categoryId = null; });
+    onDelete: g ? async () => {
+      const n = S.expenses.filter(e => (e.segmentIds || []).includes(g.id)).length;
+      if (!await confirmDlg('Eliminar segmento', `¿Eliminar "${g.name}"?${n ? ` Se quitará de ${n} movimiento(s); los movimientos se conservan.` : ''}`)) return false;
+      S.segments = S.segments.filter(k => k.id !== g.id); S.expenses.forEach(e => { e.segmentIds = (e.segmentIds || []).filter(v => v !== g.id); });
+      if (UI.segF === g.id) UI.segF = '';
     } : null,
   });
 }
@@ -1130,7 +1194,7 @@ function cardForm(id) {
       Object.assign(rec, { name, color: f.color || rec.color || 'zinc', limit: r2(num(f.limit)), msi: r2(num(f.msi)), other: r2(num(f.other)), cutDay: cd, dueDay: dd });
       // Reconstruye las bases para que los valores escritos sean los vigentes hoy
       const T = T0(), lastCut = lastOnOrBefore(cd, T), lc = toISO(lastCut);
-      const exps = S.expenses.filter(e => e.cardId === rec.id);
+      const exps = S.expenses.filter(e => e.cardId === rec.id && !isInc(e));
       const closed = sum(exps.filter(e => e.date <= lc), e => e.amount), open = sum(exps.filter(e => e.date > lc), e => e.amount);
       const pay = sum(paysFor('card', rec.id), p => p.amount);
       rec.periodBase = r2(num(f.due) - (closed - pay));
@@ -1308,7 +1372,7 @@ const A = {
   menu: () => openDrawer(), closeMenu: () => closeDrawer(),
   nav: d => { UI.view = d.v; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
   fab: () => { closeDrawer(); openQuick(); },
-  quick: d => { sheets.pop(); ({ sale: () => saleForm(), expense: () => expForm(), pay: () => payForm(), credit: () => creditForm(), debt: () => debtForm(), product: () => productForm(), client: () => clientForm() })[d.v](); },
+  quick: d => { sheets.pop(); ({ sale: () => saleForm(), income: () => movForm(null, { type: 'ingreso' }), expense: () => movForm(null, { type: 'gasto' }), pay: () => payForm(), credit: () => creditForm(), debt: () => debtForm(), product: () => productForm(), client: () => clientForm() })[d.v](); },
   setUI: d => { UI[d.k] = d.v; renderAll(); },
   setPeriod: d => { UI[d.k + 'P'] = d.v; UI[d.k + 'O'] = 0; renderAll(); },
   periodNav: d => { UI[d.k + 'O'] = Math.min(0, (UI[d.k + 'O'] || 0) + (+d.v)); renderAll(); },
@@ -1324,12 +1388,20 @@ const A = {
   newCredit: d => creditForm(null, { clientId: d.client }), editCredit: d => creditForm(d.id), creditDetail: d => creditDetail(d.id),
   delCredit: async d => { if (await delCredit(d.id)) { persist(); closeSheet(); renderAll(); toast('Eliminado'); } },
   newPay: d => payForm(null, { kind: d.kind, targetId: d.target }), editPay: d => payForm(d.id),
-  newExpense: d => expForm(null, { cardId: d.card, categoryId: d.cat }), editExpense: d => expForm(d.id),
-  newCategory: () => categoryForm(), editCategory: d => categoryForm(d.id),
+  newMov: d => movForm(null, { type: d.type, segId: d.seg }), newExpense: d => movForm(null, { type: 'gasto', cardId: d.card }), editExpense: d => movForm(d.id),
+  newSegment: () => segmentForm(), editSegment: d => segmentForm(d.id),
+  addSegInline: () => {
+    const f = $('#sheetForm'), i = f.elements.newSeg, n = (i.value || '').trim();
+    if (!n) return toast('Escribe el nombre del segmento', 'error');
+    const ex = S.segments.find(k => k.name.toLowerCase() === n.toLowerCase()), val = ex ? ex.id : 'new:' + n, box = f.querySelector('#segBox');
+    const cb = [...box.querySelectorAll('input[name=seg]')].find(c => c.value === val || (c.value.startsWith('new:') && c.value.slice(4).toLowerCase() === n.toLowerCase()));
+    if (cb) cb.checked = true; else box.insertAdjacentHTML('beforeend', segChip(val, ex ? ex.name : n, true));
+    i.value = ''; i.focus();
+  },
   newCard: () => cardForm(), editCard: d => cardForm(d.id), cardDetail: d => cardDetail(d.id),
   newAccount: () => accountForm(), editAccount: d => accountForm(d.id), accountDetail: d => accountDetail(d.id),
   newDebt: () => debtForm(), editDebt: d => debtForm(d.id), debtDetail: d => debtDetail(d.id),
-  editRec: d => ({ sale: () => saleForm(d.id), expense: () => expForm(d.id), payment: () => payForm(d.id), credit: () => creditDetail(d.id), debt: () => debtDetail(d.id) })[d.t]?.(),
+  editRec: d => ({ sale: () => saleForm(d.id), expense: () => movForm(d.id), payment: () => payForm(d.id), credit: () => creditDetail(d.id), debt: () => debtDetail(d.id) })[d.t]?.(),
   export: () => exportData(),
   import: () => $('#importFile').click(),
   copyJson: async () => { try { await navigator.clipboard.writeText(JSON.stringify(S)); toast('Datos copiados al portapapeles'); } catch (e) { toast('No se pudo copiar', 'error'); } },

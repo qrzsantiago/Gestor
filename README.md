@@ -13,7 +13,7 @@ Web App de una sola página (`index.html`) para iPhone (Safari → **Compartir �
 - **Inventario:** solo nombre/modelo libre y unidades disponibles.
 - **Ventas:** historial completo; cada venta descuenta unidades del inventario.
 - **Clientes** y **Créditos y Préstamos** (secciones independientes): sin plazos fijos; interés sobre saldo insoluto en cada fecha de corte, con % y día de corte modificables; abonos de cualquier monto.
-- **Gastos:** categorías creadas por el usuario (libres, semanales, quincenales o mensuales).
+- **Ingresos y Gastos:** cada movimiento es un **Ingreso** (verde, `+`) o un **Gasto** (rojo, `−`). El balance del período muestra ingresos contra gastos y si sobró dinero o se gastó de más. Cada movimiento puede marcarse en **varios segmentos** a la vez (casillas de selección múltiple), creados libremente por el usuario; un mismo registro suma en cada segmento marcado sin duplicarse.
 - **Mis Deudas**, **Movimientos** (todo editable) y **Respaldo y Ajustes**.
 
-Cualquier registro puede editarse o eliminarse; todo se recalcula al momento. Los datos de la versión anterior se migran automáticamente.
+Cualquier registro puede editarse o eliminarse; todo se recalcula al momento. Los datos de versiones anteriores se migran automáticamente (las categorías pasan a ser segmentos). La versión instalada se ve en el menú ☰.
