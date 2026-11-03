@@ -15,6 +15,6 @@ Web App de una sola página (`index.html`) para iPhone (Safari → **Compartir �
 5. **Clientes:** tarjetas verticales con saldo actual y deuda total en números grandes, avance de pago e historial detallado (fecha, concepto, monto y saldo después de cada movimiento, incluidos intereses). Selector de orden: *Mayor deuda*, *A – Z* y *Recientes*.
 6. **Deudas:** el **Total por pagar** incluye todo: deudas propias, pago actual de las tarjetas y cortes siguientes (compras a meses y saldos diferidos), con una barra de composición. El desglose lista cada compromiso (cada deuda propia, cada tarjeta "este período" y "próximos meses") con barra proporcional, monto, % del total, estado y fecha. Incluye deudas liquidadas e historial de pagos.
 
-La navegación es solo con botones explícitos (sin gestos de deslizamiento): ✕ cierra ventanas y menú, la flecha ‹ regresa, y tocar fuera no cierra nada. El botón ⚙ del encabezado abre **Respaldo y Ajustes** (exportar/importar JSON). Las semanas van de domingo a sábado. Si la fecha se deja vacía se usa la de hoy.
+El botón ⚙ del encabezado abre **Respaldo y Ajustes** (exportar/importar JSON). Las semanas van de domingo a sábado. Si la fecha se deja vacía se usa la de hoy.
 
 Cualquier registro puede editarse o eliminarse; todo se recalcula al momento. Los datos de versiones anteriores se migran automáticamente (las categorías pasan a ser segmentos). La versión instalada se ve en el menú ☰.
