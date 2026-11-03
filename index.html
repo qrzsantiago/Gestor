@@ -8,65 +8,60 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gestor">
 <meta name="application-name" content="Gestor">
-<meta name="theme-color" content="#131416">
+<meta name="theme-color" content="#141414">
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
 <meta name="description" content="Administración financiera e inventario local">
 <title>Gestor · Finanzas e Inventario</title>
 <link rel="apple-touch-icon" id="touchIcon" href="data:,">
 <link rel="icon" id="favIcon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script>
-  /* Paleta sobria: grises monocromáticos; verde y rojo casi desaturados solo como acento de ingresos/gastos */
-  tailwind.config = { darkMode: 'class', theme: { extend: { colors: {"zinc": {"50": "#f4f5f6", "100": "#e7e8ea", "200": "#d3d5d8", "300": "#b9bcc0", "400": "#989ba1", "500": "#75787e", "600": "#585b61", "700": "#3e4045", "800": "#2c2e32", "900": "#212226", "950": "#161719"}, "slate": {"50": "#f4f5f6", "100": "#e7e8ea", "200": "#d3d5d8", "300": "#b9bcc0", "400": "#989ba1", "500": "#75787e", "600": "#585b61", "700": "#3e4045", "800": "#2c2e32", "900": "#212226", "950": "#161719"}, "emerald": {"50": "#f1f4f2", "100": "#e1e8e3", "200": "#d0dbd3", "300": "#c4d3c8", "400": "#a8bcae", "500": "#8fa596", "600": "#748a7b", "700": "#5b6e61", "800": "#455349", "900": "#2e3831", "950": "#1d241f"}, "teal": {"50": "#f1f4f2", "100": "#e1e8e3", "200": "#d0dbd3", "300": "#c4d3c8", "400": "#a8bcae", "500": "#8fa596", "600": "#748a7b", "700": "#5b6e61", "800": "#455349", "900": "#2e3831", "950": "#1d241f"}, "rose": {"50": "#f6f1f1", "100": "#efe3e3", "200": "#ead2d2", "300": "#dcb4b4", "400": "#c99a9a", "500": "#b37f7f", "600": "#966565", "700": "#7a5050", "800": "#5e3d3d", "900": "#4a3131", "950": "#2c1f1f"}, "red": {"50": "#f6f1f1", "100": "#efe3e3", "200": "#ead2d2", "300": "#dcb4b4", "400": "#c99a9a", "500": "#b37f7f", "600": "#966565", "700": "#7a5050", "800": "#5e3d3d", "900": "#4a3131", "950": "#2c1f1f"}, "sky": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "indigo": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "violet": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "purple": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "amber": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "orange": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}}, fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Text"','"SF Pro Display"','"Inter"','"Segoe UI"','Roboto','sans-serif'] } } } };
+  /* Paleta: grises neutros contrastados; coral para gastos, verde para ingresos, ámbar para avisos */
+  tailwind.config = { darkMode: 'class', theme: { extend: { colors: {"zinc": {"50": "#fafafa", "100": "#f2f2f2", "200": "#e4e4e4", "300": "#d0d0d0", "400": "#a9a9a9", "500": "#8b8b8b", "600": "#6c6c6c", "700": "#424242", "800": "#2b2b2b", "900": "#1e1e1e", "950": "#141414"}, "slate": {"50": "#fafafa", "100": "#f2f2f2", "200": "#e4e4e4", "300": "#d0d0d0", "400": "#a9a9a9", "500": "#8b8b8b", "600": "#6c6c6c", "700": "#424242", "800": "#2b2b2b", "900": "#1e1e1e", "950": "#141414"}, "emerald": {"50": "#effaf3", "100": "#d8f3e2", "200": "#b3e8c8", "300": "#8edcaf", "400": "#5fcd90", "500": "#3fbd78", "600": "#2f9c62", "700": "#267b4e", "800": "#1d5b3a", "900": "#133b26", "950": "#0b2217"}, "teal": {"50": "#effaf3", "100": "#d8f3e2", "200": "#b3e8c8", "300": "#8edcaf", "400": "#5fcd90", "500": "#3fbd78", "600": "#2f9c62", "700": "#267b4e", "800": "#1d5b3a", "900": "#133b26", "950": "#0b2217"}, "rose": {"50": "#fdf1f0", "100": "#fbe0dd", "200": "#f7c3be", "300": "#f2a39b", "400": "#ec7a70", "500": "#e5645a", "600": "#cf5047", "700": "#a93f37", "800": "#7e302a", "900": "#4f1f1b", "950": "#2c1210"}, "red": {"50": "#fdf1f0", "100": "#fbe0dd", "200": "#f7c3be", "300": "#f2a39b", "400": "#ec7a70", "500": "#e5645a", "600": "#cf5047", "700": "#a93f37", "800": "#7e302a", "900": "#4f1f1b", "950": "#2c1210"}, "amber": {"50": "#fdf7ec", "100": "#faeccd", "200": "#f4d99c", "300": "#eec46d", "400": "#e7b155", "500": "#d99a36", "600": "#b77d27", "700": "#8f611f", "800": "#664517", "900": "#402b0f", "950": "#251809"}, "orange": {"50": "#fdf7ec", "100": "#faeccd", "200": "#f4d99c", "300": "#eec46d", "400": "#e7b155", "500": "#d99a36", "600": "#b77d27", "700": "#8f611f", "800": "#664517", "900": "#402b0f", "950": "#251809"}, "sky": {"50": "#f5f5f5", "100": "#e8e8e8", "200": "#d6d6d6", "300": "#c8c8c8", "400": "#b0b0b0", "500": "#979797", "600": "#7b7b7b", "700": "#5e5e5e", "800": "#464646", "900": "#323232", "950": "#222222"}, "indigo": {"50": "#f5f5f5", "100": "#e8e8e8", "200": "#d6d6d6", "300": "#c8c8c8", "400": "#b0b0b0", "500": "#979797", "600": "#7b7b7b", "700": "#5e5e5e", "800": "#464646", "900": "#323232", "950": "#222222"}, "violet": {"50": "#f5f5f5", "100": "#e8e8e8", "200": "#d6d6d6", "300": "#c8c8c8", "400": "#b0b0b0", "500": "#979797", "600": "#7b7b7b", "700": "#5e5e5e", "800": "#464646", "900": "#323232", "950": "#222222"}, "purple": {"50": "#f5f5f5", "100": "#e8e8e8", "200": "#d6d6d6", "300": "#c8c8c8", "400": "#b0b0b0", "500": "#979797", "600": "#7b7b7b", "700": "#5e5e5e", "800": "#464646", "900": "#323232", "950": "#222222"}}, fontFamily: { sans: ['Nunito','-apple-system','BlinkMacSystemFont','"SF Pro Rounded"','"SF Pro Text"','"Segoe UI"','Roboto','sans-serif'] } } } };
 </script>
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <style>
   :root { color-scheme: dark; }
-  :root {
-    --bg: #131416;
-    --raise: 8px 8px 18px rgba(0,0,0,.52), -6px -6px 16px rgba(255,255,255,.028);
-    --raise-sm: 4px 4px 10px rgba(0,0,0,.48), -3px -3px 8px rgba(255,255,255,.032);
-    --press: inset 3px 3px 8px rgba(0,0,0,.58), inset -2px -2px 6px rgba(255,255,255,.035);
-    --hl: inset 0 1px 0 rgba(255,255,255,.06);
-  }
+  :root { --bg: #141414; --card: #1d1d1d; --soft: 0 1px 0 rgba(255,255,255,.035) inset, 0 10px 28px rgba(0,0,0,.35); }
   html, body { background-color: var(--bg); max-width:100%; overflow-x:hidden; overscroll-behavior-y:none; }
-  /* Fondo gris casi negro con luz suave y grano sutil */
-  body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background:
-      radial-gradient(900px 520px at 12% -8%, rgba(255,255,255,.07), transparent 62%),
-      radial-gradient(700px 480px at 108% 38%, rgba(255,255,255,.045), transparent 60%),
-      radial-gradient(800px 600px at 40% 115%, rgba(255,255,255,.035), transparent 60%),
-      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
-  body { letter-spacing: -.005em; }
-  h1, h2, h3, h4 { letter-spacing: -.015em; }
-  /* Cristal esmerilado: encabezado, contenedores principales, hojas y menú */
-  :root header { background: rgba(19,20,22,.58) !important; -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%); border-color: rgba(255,255,255,.05) !important; }
-  :root .bg-zinc-900\/70 { background: linear-gradient(160deg, rgba(52,54,59,.52), rgba(30,31,35,.56)) !important; -webkit-backdrop-filter: blur(18px) saturate(120%); backdrop-filter: blur(18px) saturate(120%);
-    border-color: rgba(255,255,255,.055) !important; box-shadow: var(--raise), var(--hl); }
-  :root #sheetRoot > div > div, :root #confirm > div.relative { background: rgba(31,32,36,.84) !important; -webkit-backdrop-filter: blur(28px) saturate(130%); backdrop-filter: blur(28px) saturate(130%); border-color: rgba(255,255,255,.07) !important; box-shadow: 0 -10px 40px rgba(0,0,0,.5), var(--hl) !important; }
-  :root #drawerPanel { background: rgba(24,25,28,.82) !important; -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); border-color: rgba(255,255,255,.06) !important; }
-  :root .flip-face.bg-zinc-900 { background: linear-gradient(160deg, #2e3034, #1e1f23) !important; box-shadow: var(--raise), var(--hl); }
-  /* Neumorfismo: superficies elevadas (botones, avatares) y hundidas (campos, pistas, datos) */
-  :root .bg-zinc-800:not(.overflow-hidden), :root .bg-zinc-700\/80 { background: linear-gradient(145deg, #34363b, #26282c) !important; box-shadow: var(--raise-sm), var(--hl); border-color: rgba(255,255,255,.05) !important; }
-  :root button.bg-zinc-800:active, :root button.bg-zinc-900:active { box-shadow: var(--press) !important; }
-  :root .bg-zinc-800.overflow-hidden { background: #1a1b1e !important; box-shadow: var(--press); }
-  :root :not(body).bg-zinc-950, :root .bg-zinc-950\/60, :root .bg-zinc-950\/40, :root input.bg-zinc-900 { background: #18191c !important; box-shadow: var(--press); border-color: rgba(255,255,255,.035) !important; }
-  :root .grid.bg-zinc-900, :root .grid.bg-zinc-950 { background: #18191c !important; box-shadow: var(--press); }
-  :root button.bg-zinc-900 { background: linear-gradient(145deg, #2a2c30, #202125) !important; box-shadow: var(--raise-sm); border-color: rgba(255,255,255,.045) !important; }
-  :root .bg-zinc-100 { background: linear-gradient(145deg, #eceef0, #c3c6ca) !important; box-shadow: var(--raise-sm), inset 0 1px 0 rgba(255,255,255,.7); }
-  :root .peer:checked ~ .peer-checked\:bg-zinc-700 { background: linear-gradient(145deg, #3d4045, #2d2f33) !important; box-shadow: var(--raise-sm), var(--hl); }
-  /* Botón principal y botón flotante: plástico gris claro */
-  :root .bg-emerald-500 { background: linear-gradient(145deg, #e8eaec, #b1b4b9) !important; color: #17181b !important; box-shadow: var(--raise-sm), inset 0 1px 0 rgba(255,255,255,.75) !important; }
-  :root .bg-emerald-500:active { box-shadow: var(--press) !important; background: linear-gradient(145deg, #b9bcc1, #dcdee1) !important; }
-  :root #fab { box-shadow: 10px 10px 22px rgba(0,0,0,.6), -5px -5px 14px rgba(255,255,255,.04), inset 0 1px 0 rgba(255,255,255,.75) !important; }
-  /* Tarjeta de crédito: plástico gris claro con brillo suave */
-  .card-plastic { box-shadow: 12px 14px 28px rgba(0,0,0,.58), -6px -6px 16px rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.75), inset 0 -3px 8px rgba(0,0,0,.12); }
-  .pillar { box-shadow: 6px 8px 16px rgba(0,0,0,.5), -3px -3px 10px rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -6px 14px rgba(0,0,0,.18); }
-  /* Iconos: línea fina */
-  svg.lucide { stroke-width: 1.5; }
+  body { letter-spacing: 0; font-weight: 500; }
+  h1, h2, h3, h4 { letter-spacing: -.01em; font-weight: 800; }
+  .font-semibold { font-weight: 700 !important; } .font-medium { font-weight: 600 !important; }
+  /* Superficies planas y contrastadas */
+  :root header { background: rgba(20,20,20,.86) !important; -webkit-backdrop-filter: blur(20px) saturate(140%); backdrop-filter: blur(20px) saturate(140%); border-color: rgba(255,255,255,.04) !important; }
+  :root .bg-zinc-900\/70 { background: var(--card) !important; border-color: rgba(255,255,255,.05) !important; box-shadow: var(--soft); }
+  :root #sheetRoot > div > div, :root #confirm > div.relative { background: rgba(26,26,26,.97) !important; -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); border-color: rgba(255,255,255,.07) !important; box-shadow: 0 -12px 40px rgba(0,0,0,.55) !important; }
+  :root #drawerPanel { background: #171717 !important; border-color: rgba(255,255,255,.06) !important; }
+  :root .flip-face.bg-zinc-900 { background: #232323 !important; box-shadow: var(--soft); }
+  :root .bg-zinc-800:not(.overflow-hidden), :root .bg-zinc-700\/80 { background: #2a2a2a !important; border-color: rgba(255,255,255,.05) !important; }
+  :root .bg-zinc-800.overflow-hidden { background: #262626 !important; }
+  :root :not(body).bg-zinc-950, :root .bg-zinc-950\/60, :root .bg-zinc-950\/40, :root input.bg-zinc-900 { background: #181818 !important; border-color: rgba(255,255,255,.06) !important; }
+  :root .grid.bg-zinc-900, :root .grid.bg-zinc-950 { background: #1b1b1b !important; }
+  :root button.bg-zinc-900 { background: #232323 !important; border-color: rgba(255,255,255,.05) !important; }
+  :root .bg-zinc-100 { background: #f2f2f2 !important; }
+  :root .peer:checked ~ .peer-checked\:bg-zinc-700 { background: #3a3a3a !important; }
+  :root button:active { filter: brightness(1.12); }
+  /* Botón principal y botón flotante: blanco, contraste alto */
+  :root .bg-emerald-500 { background: #f4f4f4 !important; color: #121212 !important; box-shadow: 0 6px 18px rgba(0,0,0,.35) !important; }
+  :root .bg-emerald-500:active { background: #d9d9d9 !important; }
+  :root #fab { box-shadow: 0 10px 26px rgba(0,0,0,.55) !important; }
+  /* Chips estilo MonAI */
+  .mchip { position: relative; display: inline-flex; align-items: center; gap: .4rem; height: 36px; padding: 0 .8rem; border-radius: 12px; background: #252525; color: #f2f2f2; font-weight: 700; font-size: 15px; border: 1px solid rgba(255,255,255,.05); }
+  .mchip > input, .mchip > select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; min-height: 0; cursor: pointer; }
+  /* Interruptor − / + junto al monto */
+  .signsw { display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border-radius: 9999px; background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); width: 132px; flex-shrink: 0; }
+  .signsw span { display: block; height: 44px; line-height: 42px; text-align: center; border-radius: 9999px; font-size: 28px; font-weight: 800; color: #e8e8e8; transition: background .15s, color .15s; }
+  .signsw input[value=gasto]:checked + span { background: #e5645a; color: #1a0f0e; }
+  .signsw input[value=ingreso]:checked + span { background: #3fbd78; color: #0b1d13; }
+  /* Tarjeta de crédito y pilares */
+  .card-plastic { box-shadow: 0 14px 30px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.7), inset 0 -3px 8px rgba(0,0,0,.1); }
+  .pillar { box-shadow: 0 8px 18px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.5); }
+  svg.lucide { stroke-width: 1.75; }
   body { -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent; touch-action:manipulation; -webkit-text-size-adjust:100%; }
   button, label, a { -webkit-user-select:none; user-select:none; cursor:pointer; }
-  input, select, textarea { font-size:16px !important; }
+  input:not(.big-in), select, textarea { font-size:16px !important; }
   input[type="date"] { -webkit-appearance:none; appearance:none; min-height:48px; display:flex; align-items:center; }
   input[type="date"]::-webkit-date-and-time-value { text-align:left; }
   input[type="date"]::-webkit-calendar-picker-indicator { filter:invert(.6); }
@@ -87,9 +82,9 @@
   .flip-back { position: absolute; inset: 0; transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
   /* Casillas de segmentos (selección múltiple con puntito) */
-  .segc:checked + .segv { border-color: rgba(255,255,255,.18); background: linear-gradient(145deg, #3a3c41, #2a2c30); color: #eceef0; box-shadow: var(--raise-sm); }
-  .segc:checked + .segv .segdot { border-color: #d3d5d8; }
-  .segc:checked + .segv .segdot::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: #e7e8ea; }
+  .segc:checked + .segv { border-color: rgba(255,255,255,.35); background: #333; color: #fff; }
+  .segc:checked + .segv .segdot { border-color: #fff; }
+  .segc:checked + .segv .segdot::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: #fff; }
   .segc:focus-visible + .segv { outline: 2px solid rgba(52,211,153,.6); outline-offset: 2px; }
 </style>
 </head>
@@ -141,7 +136,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.13';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.14';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -282,6 +277,43 @@ function saveUI() { try { localStorage.setItem(LSUI, JSON.stringify(UI)); } catc
 const accName = id => byId(S.accounts, id)?.name || '';
 const cliName = id => byId(S.clients, id)?.name || '';
 const isInc = e => e.type === 'ingreso';
+/* Movimientos recurrentes: el registro original guarda la frecuencia; la app crea solita cada repetición hasta hoy.
+   Cada repetición es un movimiento normal (se puede editar o borrar) ligado a la serie. */
+const REP = { dia: 'Diariamente', sem: 'Semanalmente', quin: 'Quincenalmente', mes: 'Mensualmente', bim: 'Bimensualmente', tri: 'Trimestralmente', anu: 'Anualmente' };
+const REP_PER_MONTH = { dia: 30.44, sem: 4.348, quin: 2, mes: 1, bim: .5, tri: 1 / 3, anu: 1 / 12 };
+function occDate(startISO, rep, k) {
+  const st = pd(startISO), y = st.getFullYear(), m = st.getMonth(), d = st.getDate();
+  switch (rep) {
+    case 'dia': return addDays(st, k);
+    case 'sem': return addDays(st, 7 * k);
+    case 'quin': return d <= 15 ? (k % 2 ? dayIn(y, m + (k - 1) / 2, d + 15) : dayIn(y, m + k / 2, d)) : (k % 2 ? dayIn(y, m + (k + 1) / 2, d - 15) : dayIn(y, m + k / 2, d));
+    case 'mes': return dayIn(y, m + k, d);
+    case 'bim': return dayIn(y, m + 2 * k, d);
+    case 'tri': return dayIn(y, m + 3 * k, d);
+    case 'anu': return dayIn(y + k, m, d);
+  }
+  return null;
+}
+function nextOcc(root) {
+  if (!REP[root.repeat]) return null;
+  const lim = root.genUntil && root.genUntil > today() ? root.genUntil : today();
+  for (let k = 1; k < 5000; k++) { const dt = toISO(occDate(root.date, root.repeat, k)); if (dt > lim) return dt; }
+  return null;
+}
+function runRecurring() {
+  const T = today(); let made = 0;
+  S.expenses.filter(e => REP[e.repeat] && !e.seriesId).forEach(root => {
+    let gu = root.genUntil || root.date;
+    for (let k = 1; k < 5000; k++) {
+      const dt = toISO(occDate(root.date, root.repeat, k)); if (dt > T) break; if (dt <= gu) continue;
+      const occ = { id: uid(), createdAt: Date.now(), seriesId: root.id, type: root.type, amount: root.amount, segmentIds: [...(root.segmentIds || [])], concept: root.concept || '', date: dt, accountId: root.accountId || null, cardId: root.cardId || null };
+      if (root.months) occ.months = root.months;
+      S.expenses.push(occ); gu = dt; made++;
+    }
+    root.genUntil = gu;
+  });
+  return made;
+}
 const segNames = ids => (ids || []).map(id => byId(S.segments, id)?.name).filter(Boolean);
 const signed = n => (n > 0.005 ? '+' : n < -0.005 ? '−' : '') + fmt(Math.abs(n));
 const defaultAcc = () => byId(S.accounts, S.settings.defaultAccount) ? S.settings.defaultAccount : '';
@@ -457,7 +489,7 @@ function ledger() {
   S.expenses.forEach(e => {
     const inc = isInc(e), card = inc ? null : byId(S.cards, e.cardId), segs = segNames(e.segmentIds).join(', ');
     L.push({ t: 'expense', id: e.id, date: e.date, cr: e.createdAt || 0, title: e.concept || segs || (inc ? 'Ingreso' : 'Gasto'),
-      sub: [inc ? 'Ingreso' : 'Gasto', e.concept ? segs : '', card ? card.name : accName(e.accountId), card && cardMonths(e) >= 2 ? `${cardMonths(e)} meses` : ''].filter(Boolean).join(' · '),
+      sub: [inc ? 'Ingreso' : 'Gasto', e.concept ? segs : '', card ? card.name : accName(e.accountId), card && cardMonths(e) >= 2 ? `${cardMonths(e)} meses` : '', REP[e.repeat] || e.seriesId ? 'Recurrente' : ''].filter(Boolean).join(' · '),
       amount: e.amount, sign: inc ? 1 : -1, acc: card ? null : e.accountId, card: card ? e.cardId : null, segs: e.segmentIds || [],
       icon: inc ? 'arrow-down-left' : 'receipt', tone: inc ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400', type: inc ? 'ingresos' : 'gastos' });
   });
@@ -712,7 +744,7 @@ function confirmDlg(title, msg, okLabel = 'Eliminar', danger = true) {
     d.onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; d.classList.add('hidden'); d.onclick = null; res(b.dataset.c === '1'); };
   });
 }
-function icons() { try { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 1.5 } }); } catch (e) {} }
+function icons() { try { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 1.75 } }); } catch (e) {} }
 
 const VIEWS = [
   ['dashboard', 'Resumen', 'layout-dashboard'],
@@ -1068,6 +1100,19 @@ R.gastos = () => {
     }).join(''));
     h += `<div class="text-[11px] text-zinc-500 mt-2 px-1">Toca los segmentos para combinarlos en el balance. Cada fila muestra sus propios totales del período.</div>`;
   } else h += empty('tags', 'Sin segmentos creados.');
+  // Transacciones recurrentes (se ven por aparte)
+  const RC = S.expenses.filter(e => REP[e.repeat] && !e.seriesId).sort((a, b) => (nextOcc(a) || '').localeCompare(nextOcc(b) || ''));
+  h += secTitle('Recurrentes', `<span class="text-[12px] text-zinc-500">${RC.length} activa${RC.length !== 1 ? 's' : ''}</span>`);
+  if (RC.length) {
+    const mo = t => r2(sum(RC.filter(e => (e.type === 'ingreso') === t), e => e.amount * REP_PER_MONTH[e.repeat]));
+    h += `<div class="grid grid-cols-2 gap-2 mb-2">${kv('Gasto fijo al mes', '−' + fmt(mo(false)), 'text-rose-400')}${kv('Ingreso fijo al mes', '+' + fmt(mo(true)), 'text-emerald-400')}</div>`;
+    h += listBox(RC.map(e => { const inc = isInc(e), card = byId(S.cards, e.cardId), n = S.expenses.filter(x => x.seriesId === e.id).length + 1, nx = nextOcc(e);
+      return `<button data-act="editExpense" data-id="${e.id}" class="w-full flex items-center gap-3 px-3.5 py-3 text-left active:bg-zinc-800/60">
+        <span class="w-10 h-10 shrink-0 rounded-xl grid place-items-center bg-zinc-800 text-zinc-200">${icon('repeat', 'w-[18px] h-[18px]')}</span>
+        <span class="flex-1 min-w-0"><span class="block text-[15px] truncate">${esc(e.concept || segNames(e.segmentIds).join(', ') || (inc ? 'Ingreso' : 'Gasto'))}</span><span class="block text-xs text-zinc-500 truncate">${REP[e.repeat]}${card ? ' · ' + esc(card.name) : e.accountId ? ' · ' + esc(accName(e.accountId)) : ''} · ${n} registro${n !== 1 ? 's' : ''}</span></span>
+        <span class="text-right shrink-0"><span class="block font-semibold tabular-nums ${inc ? 'text-emerald-400' : 'text-rose-400'}">${inc ? '+' : '−'}${fmt(e.amount)}</span><span class="block text-[11px] text-zinc-500">${nx ? 'Próximo ' + fmtDs(nx) : ''}</span></span>
+      </button>`; }).join(''));
+  } else h += empty('repeat', 'Sin transacciones recurrentes. Al registrar un movimiento elige "Repetir".');
   h += secTitle(on ? `Registros · ${esc(segLabel)}` : 'Registros');
   const LL = ledger().filter(x => x.t === 'expense' && inRange(x.date, r) && inSeg(byId(S.expenses, x.id)));
   h += LL.length ? groupedLedger(LL) : empty('arrow-up-down', 'Sin movimientos en este período.');
@@ -1155,6 +1200,7 @@ R.ajustes = () => {
 };
 
 function renderAll() {
+  if (runRecurring()) persist();
   const v = ALL_VIEWS.find(x => x[0] === UI.view) || VIEWS[0]; UI.view = v[0];
   $('#viewTitle').textContent = v[1];
   const d = new Date(); $('#hdrRight').textContent = `${d.getDate()} ${MESC[d.getMonth()]}`;
@@ -1166,8 +1212,13 @@ function renderAll() {
    FORMULARIOS
    ========================================================= */
 function openQuick() {
-  const tile = (v, l, ic, cls) => `<button type="button" data-act="quick" data-v="${v}" class="rounded-2xl p-4 border border-zinc-800 bg-zinc-950/60 active:scale-[.97] transition text-center"><span class="w-12 h-12 mx-auto rounded-2xl grid place-items-center ${cls}">${icon(ic, 'w-6 h-6')}</span><span class="block mt-2 font-semibold text-sm">${l}</span></button>`;
-  openSheet({ title: 'Registro rápido', body: () => `<div class="grid grid-cols-2 gap-3 mb-2">${tile('sale', 'Venta', 'shopping-bag', 'bg-emerald-500/15 text-emerald-400')}${tile('pay', 'Abono', 'hand-coins', 'bg-sky-500/15 text-sky-400')}${tile('mov', 'Ingreso / Gasto', 'arrow-up-down', 'bg-rose-500/15 text-rose-300')}${tile('debt', 'Deuda propia', 'landmark', 'bg-amber-500/15 text-amber-400')}</div>` });
+  const tile = (v, l, ic) => `<button type="button" data-act="quick" data-v="${v}" class="rounded-2xl h-[88px] border border-zinc-800 bg-zinc-950/60 active:scale-[.97] transition flex flex-col items-center justify-center gap-1.5"><span class="w-10 h-10 rounded-xl grid place-items-center bg-zinc-800 text-zinc-100">${icon(ic, 'w-5 h-5')}</span><span class="font-bold text-[15px]">${l}</span></button>`;
+  openSheet({ title: 'Registro rápido', body: () => `
+    <button type="button" data-act="quick" data-v="mov" class="w-full rounded-2xl h-[104px] mb-3 border border-zinc-800 bg-zinc-950/60 active:scale-[.98] transition flex items-center justify-center gap-4">
+      <span class="flex items-center gap-1.5"><span class="w-12 h-12 rounded-full grid place-items-center bg-emerald-500/20 text-emerald-400 text-[28px] font-black leading-none">+</span><span class="w-12 h-12 rounded-full grid place-items-center bg-rose-500/20 text-rose-400 text-[28px] font-black leading-none">−</span></span>
+      <span class="text-[22px] font-extrabold tracking-tight">Ingreso / Gasto</span>
+    </button>
+    <div class="grid grid-cols-2 gap-3 mb-2">${tile('sale', 'Venta', 'shopping-bag')}${tile('pay', 'Abono', 'hand-coins')}</div>` });
 }
 
 function productForm(id) {
@@ -1372,13 +1423,21 @@ function movForm(id, preset = {}) {
   const mG = x && !isInc(x) ? (x.cardId ? 'card:' + x.cardId : x.accountId ? 'acc:' + x.accountId : '') : (preset.cardId ? 'card:' + preset.cardId : (defaultAcc() ? 'acc:' + defaultAcc() : ''));
   const mI = x && isInc(x) ? (x.accountId ? 'acc:' + x.accountId : '') : (defaultAcc() ? 'acc:' + defaultAcc() : '');
   openSheet({
-    title: x ? (x.cardId && cardMonths(x) >= 2 ? 'Editar compra a meses' : 'Editar movimiento') : (preset.msi ? 'Nueva compra a meses' : 'Nuevo movimiento'), submit: x ? 'Guardar cambios' : 'Registrar', exists: () => !id || !!byId(S.expenses, id), focus: x || !type ? null : 'amount',
+    title: x ? (x.cardId && cardMonths(x) >= 2 ? 'Editar compra a meses' : REP[x.repeat] ? 'Editar recurrente' : 'Editar movimiento') : (preset.msi ? 'Nueva compra a meses' : 'Nuevo movimiento'), submit: x ? 'Guardar cambios' : 'Registrar', exists: () => !id || !!byId(S.expenses, id), focus: x || !type ? null : 'amount',
     body: () => `
-      ${fld('Tipo de movimiento', typeToggle(type))}
-      ${fld('Monto', `<div class="relative"><span id="amtSign" class="absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-500 font-semibold pointer-events-none">$</span><input name="amount" value="${x ? fmtN(x.amount) : ''}" inputmode="decimal" autocomplete="off" data-money class="${inCls} pl-10 tabular-nums text-lg font-semibold"></div>`)}
+      <div class="flex flex-wrap gap-2 mb-4">
+        <label class="mchip">${icon('calendar', 'w-4 h-4 text-zinc-400')}<span id="dateLbl">hoy</span>${icon('chevron-down', 'w-4 h-4 text-zinc-400')}<input type="date" name="date" value="${esc(x?.date || '')}" aria-label="Fecha"></label>
+        ${x && x.seriesId ? `<span class="mchip text-zinc-400">${icon('repeat', 'w-4 h-4')}Parte de una serie</span>`
+          : `<label class="mchip">${icon('repeat', 'w-4 h-4 text-zinc-400')}<span id="repLbl">Una vez</span>${icon('chevron-down', 'w-4 h-4 text-zinc-400')}<select name="repeat" aria-label="Repetir"><option value="">Una vez</option>${Object.entries(REP).map(([k, l]) => `<option value="${k}" ${x && x.repeat === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`}
+      </div>
+      <input name="concept" value="${esc(x?.concept || '')}" placeholder="Descripción" autocomplete="off" autocorrect="off" spellcheck="false" class="big-in w-full bg-transparent border-0 outline-none text-[32px] leading-tight font-extrabold tracking-tight text-zinc-50 placeholder-zinc-700 mb-3">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="signsw"><label><input type="radio" name="type" value="gasto" ${type === 'gasto' ? 'checked' : ''} class="sr-only"><span>−</span></label><label><input type="radio" name="type" value="ingreso" ${type === 'ingreso' ? 'checked' : ''} class="sr-only"><span>+</span></label></div>
+        <input name="amount" value="${x ? fmtN(x.amount) : ''}" inputmode="decimal" autocomplete="off" data-money placeholder="0" aria-label="Monto" class="big-in flex-1 min-w-0 bg-transparent border-0 outline-none text-[40px] leading-none font-extrabold tabular-nums tracking-tight placeholder-zinc-700">
+        <span class="text-[30px] font-bold text-zinc-200 shrink-0">$</span>
+      </div>
       ${fld('Segmentos <span class="text-zinc-600 font-normal">· puedes marcar varios</span>', `<div id="segBox" class="flex flex-wrap gap-2">${[...S.segments].sort(byName).map(sg => segChip(sg.id, sg.name, selSegs.includes(sg.id))).join('')}</div>
         <div class="flex gap-2 ${S.segments.length ? 'mt-2.5' : ''}"><input name="newSeg" aria-label="Nuevo segmento" autocomplete="off" autocorrect="off" spellcheck="false" class="${inCls} h-10 flex-1 min-w-0"><button type="button" data-act="addSegInline" class="h-10 px-3.5 rounded-xl bg-zinc-800 text-sm font-semibold inline-flex items-center gap-1.5 shrink-0">${icon('plus', 'w-4 h-4')}Segmento</button></div>`)}
-      ${fld('Concepto (opcional)', inp('concept', x?.concept || ''))}
       <div data-show="type=gasto">${fld('Pagado con', sel('methodG', methodOptsG(), mG))}
         <div id="cardBox" class="hidden -mt-1 mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4">
           <div id="cardPeriod" class="text-[13px] text-zinc-400 mb-3"></div>
@@ -1388,13 +1447,14 @@ function movForm(id, preset = {}) {
             ${fld('Primera cuota', sel('firstCut', [], '', `data-v="${esc(x && cardMonths(x) >= 2 ? (x.firstCut || '') : '')}"`))}
             <div id="msiPrev" class="text-[13px] text-zinc-300 -mt-1 leading-relaxed"></div></div>
         </div></div>
-      <div data-show="type=ingreso">${fld('Entra a la cuenta', sel('methodI', methodOptsI(), mI))}</div>
-      ${fld('Fecha', dateInp('date', x?.date || ''))}`,
+      <div data-show="type=ingreso">${fld('Entra a la cuenta', sel('methodI', methodOptsI(), mI))}</div>`,
     onInput(f) {
-      const t = getVal(f, 'type'), sg = f.querySelector('#amtSign');
-      sg.textContent = t === 'ingreso' ? '+$' : t === 'gasto' ? '−$' : '$';
-      sg.className = `absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold pointer-events-none ${t === 'ingreso' ? 'text-emerald-400' : t === 'gasto' ? 'text-rose-400' : 'text-zinc-500'}`;
-      const E = f.elements, m = E.methodG.value || '', card = t === 'gasto' && m.startsWith('card:') ? byId(S.cards, m.slice(5)) : null;
+      const t = getVal(f, 'type'), E = f.elements;
+      E.amount.classList.toggle('text-rose-400', t === 'gasto'); E.amount.classList.toggle('text-emerald-400', t === 'ingreso'); E.amount.classList.toggle('text-zinc-50', !t);
+      const dv = E.date.value, y = toISO(addDays(T0(), -1));
+      f.querySelector('#dateLbl').textContent = !dv || dv === today() ? 'hoy' : dv === y ? 'ayer' : fmtDs(dv);
+      if (E.repeat) f.querySelector('#repLbl').textContent = REP[E.repeat.value] || 'Una vez';
+      const m = E.methodG.value || '', card = t === 'gasto' && m.startsWith('card:') ? byId(S.cards, m.slice(5)) : null;
       f.querySelector('#cardBox').classList.toggle('hidden', !card);
       if (!card) return;
       const on = E.msi.checked, n = parseInt(E.months.value) || 0, amt = num(E.amount.value), dISO = E.date.value || today(), per = cardPeriodOf(card, dISO);
@@ -1433,16 +1493,26 @@ function movForm(id, preset = {}) {
       if (msi && !(months >= 2 && months <= 60)) return err('Escribe el número de meses (de 2 a 60)');
       if (x && x.cardId && cardMonths(x) >= 2 && !(f.type === 'gasto' && (f.methodG || '').startsWith('card:')) && !await confirmDlg('Quitar de la tarjeta', 'Esta compra a meses dejará de estar ligada a la tarjeta y se borrará su calendario de cuotas.', 'Continuar', false)) return false;
       const rec = x || { id: uid(), createdAt: Date.now() };
+      const prevRep = x ? (x.repeat || '') : '', newRep = x && x.seriesId ? '' : (REP[f.repeat] ? f.repeat : '');
       Object.assign(rec, { type: f.type, amount, segmentIds, concept: (f.concept || '').trim(), date: f.date || today(),
         accountId: mt === 'acc' ? mid : null, cardId: f.type === 'gasto' && mt === 'card' ? mid : null });
       if (months) rec.months = months; else delete rec.months;
       if (months && /^\d{4}-\d{2}$/.test(f.firstCut || '')) rec.firstCut = f.firstCut; else delete rec.firstCut;
+      if (!(x && x.seriesId)) {
+        if (newRep) { rec.repeat = newRep; if (!prevRep || !rec.genUntil || rec.genUntil < rec.date) rec.genUntil = rec.date; }
+        else delete rec.repeat;
+      }
       if (!x) S.expenses.push(rec);
+      if (newRep && !prevRep) return `Recurrente · ${REP[newRep].toLowerCase()} · ${f.type === 'ingreso' ? '+' : '−'}${fmt(amount)}`;
       if (months) return x ? 'Compra a meses actualizada' : `Compra a meses registrada · ${months} × ${fmt(r2(amount / months))}`;
       const lbl = f.type === 'ingreso' ? 'Ingreso' : 'Gasto';
       return x ? `${lbl} actualizado` : `${lbl} registrado · ${f.type === 'ingreso' ? '+' : '−'}${fmt(amount)}`;
     },
-    onDelete: x ? async () => { if (!await confirmDlg('Eliminar movimiento', `¿Eliminar el ${isInc(x) ? 'ingreso' : 'gasto'} de ${fmt(x.amount)}?`)) return false; S.expenses = S.expenses.filter(e => e.id !== x.id); } : null,
+    onDelete: x ? async () => {
+      const isRoot = !!REP[x.repeat];
+      if (!await confirmDlg(isRoot ? 'Eliminar recurrente' : 'Eliminar movimiento', isRoot ? `Se dejará de repetir y se eliminará este registro. Los ${S.expenses.filter(e => e.seriesId === x.id).length} movimientos ya generados se conservan.` : `¿Eliminar el ${isInc(x) ? 'ingreso' : 'gasto'} de ${fmt(x.amount)}?`)) return false;
+      S.expenses = S.expenses.filter(e => e.id !== x.id); if (isRoot) S.expenses.forEach(e => { if (e.seriesId === x.id) delete e.seriesId; });
+    } : null,
   });
 }
 function segmentForm(id) {
@@ -1719,7 +1789,7 @@ const A = {
   menu: () => openDrawer(), closeMenu: () => closeDrawer(),
   nav: d => { UI.view = d.v; UI.movLimit = 60; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
   fab: () => { closeDrawer(); openQuick(); },
-  quick: d => { sheets.pop(); ({ sale: () => saleForm(), pay: () => payForm(), mov: () => movForm(), debt: () => debtForm() })[d.v](); },
+  quick: d => { sheets.pop(); ({ sale: () => saleForm(), pay: () => payForm(), mov: () => movForm() })[d.v](); },
   goInv: () => { UI.view = 'ventas'; UI.salesTab = 'inventario'; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
   goSales: () => { UI.view = 'ventas'; UI.salesTab = 'historial'; UI.salesP = UI.dashP; UI.salesO = UI.dashO; renderAll(); window.scrollTo(0, 0); },
   flipPay: (d, el) => {
@@ -1824,7 +1894,7 @@ $('#importFile').addEventListener('change', async e => { const file = e.target.f
 (function makeIcon() {
   try {
     const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
-    x.fillStyle = '#131416'; x.fillRect(0, 0, 180, 180);
+    x.fillStyle = '#141414'; x.fillRect(0, 0, 180, 180);
     const g = x.createLinearGradient(0, 0, 180, 180); g.addColorStop(0, '#e8eaec'); g.addColorStop(1, '#8f9297');
     x.fillStyle = g; x.beginPath(); x.roundRect ? x.roundRect(30, 30, 120, 120, 30) : x.rect(30, 30, 120, 120); x.fill();
     x.fillStyle = '#17181b'; x.font = 'bold 76px -apple-system, Helvetica, Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', 90, 94);
