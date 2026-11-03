@@ -102,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.8';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.9';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1009,17 +1009,59 @@ R.gastos = () => {
   return h;
 };
 
+/* Deudas: total global = deudas propias + pago actual de tarjetas + cortes siguientes (incluye compras a meses y saldos diferidos) */
+function obligations() {
+  const items = [];
+  S.debts.map(debtInfo).filter(i => i.balance > 0.005).forEach(i => {
+    const d = i.d, pct = d.amount > 0 ? i.paid / d.amount * 100 : 0;
+    items.push({ group: 'debt', act: 'debtDetail', id: d.id, title: d.creditor, amount: i.balance, icon: 'landmark', color: 'bg-amber-500', tone: 'bg-amber-500/10 text-amber-400',
+      sub: [d.concept, `Pagado ${fmt(i.paid)} de ${fmt(d.amount)} (${Math.round(pct)}%)`].filter(Boolean).join(' · '),
+      when: d.dueDate ? (i.overdue ? `Venció el ${fmtD(d.dueDate)}` : `Límite ${fmtD(d.dueDate)} · ${dayWord(i.dDue)}`) : 'Sin fecha límite', urgent: i.overdue || (i.dDue !== null && i.dDue <= 7),
+      badges: statusBadge(i) + (i.overdue ? badge('Vencida', 'bad') : '') });
+  });
+  S.cards.map(cardInfo).forEach(i => {
+    const c = i.c;
+    if (i.due > 0.005) items.push({ group: 'due', act: 'cardDetail', id: c.id, title: `${c.name} · este período`, amount: i.due, icon: 'credit-card', color: 'bg-rose-500', tone: 'bg-rose-500/10 text-rose-400',
+      sub: `Corte ${fmtD(i.curCut)}${i.curInst.length ? ` · incluye ${i.curInst.length} mensualidad${i.curInst.length !== 1 ? 'es' : ''} a meses` : ''}`,
+      when: i.dDue < 0 ? `Venció el ${fmtD(i.dueDate)}` : `Pagar antes del ${fmtD(i.dueDate)} · ${dayWord(i.dDue)}`, urgent: i.dDue <= 7,
+      badges: badge(i.dDue < 0 ? 'Vencido' : i.dDue <= 3 ? 'Urgente' : i.dDue <= 7 ? 'Próximo' : 'Al corriente', i.dDue < 0 || i.dDue <= 3 ? 'bad' : i.dDue <= 7 ? 'warn' : 'ok') });
+    const later = r2(i.futureTotal + i.legacyDef);
+    if (later > 0.005) {
+      const cuts = i.schedule.filter(g => g.amount > 0.005), nx = cuts[0];
+      items.push({ group: 'later', act: 'cardDetail', id: c.id, title: `${c.name} · próximos meses`, amount: later, icon: 'calendar-range', color: 'bg-violet-400', tone: 'bg-violet-500/10 text-violet-300',
+        sub: [cuts.length ? `${cuts.length} corte${cuts.length !== 1 ? 's' : ''} por venir` : '', i.instPending > 0.005 ? `Compras a meses ${fmt(i.instPending)}` : '', i.legacyDef > 0.005 ? `Saldo diferido ${fmt(i.legacyDef)}` : ''].filter(Boolean).join(' · '),
+        when: nx ? `Siguiente corte ${fmtD(nx.cut)}: ${fmt(nx.amount)}` : 'Saldo diferido', urgent: false, badges: badge('Diferido', 'info') });
+    }
+  });
+  return items;
+}
 R.deudas = () => {
-  const infos = S.debts.map(debtInfo), cards = S.cards.map(cardInfo);
-  const dOwed = sum(infos, i => i.balance), cDue = sum(cards, i => i.due), cDef = sum(cards, i => i.owed - i.due);
+  const items = obligations(), total = r2(sum(items, x => x.amount));
+  const g = k => r2(sum(items.filter(x => x.group === k), x => x.amount));
+  const dOwed = g('debt'), cDue = g('due'), cLater = g('later');
+  const seg = (v, cls) => total > 0 && v > 0 ? `<div class="${cls} h-full" style="width:${v / total * 100}%"></div>` : '';
   let h = `<div class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
-    <div class="text-[12px] text-zinc-400">Total por pagar</div><div class="text-[30px] font-semibold tabular-nums tracking-tight text-rose-400">${fmt(dOwed + cDue)}</div>
-    <div class="grid grid-cols-2 gap-3 mt-3">${kv('Deudas propias', fmt(dOwed))}<button data-act="nav" data-v="tarjetas" class="text-left min-w-0">${kv('TDC este período', fmt(cDue))}</button></div>
-    ${cDef > 0.005 ? `<div class="text-xs text-zinc-500 mt-3">No incluido: TDC de siguientes cortes y compras a meses <span class="tabular-nums text-zinc-400">${fmt(cDef)}</span></div>` : ''}</div>`;
-  h += `<div class="flex items-center justify-between mt-6 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Mis deudas</h2><div class="flex gap-2">${btn('Pagar', 'newPay', 'hand-coins', 'data-kind="debt"', 'ghost')}${btn('Nueva', 'newDebt')}</div></div>`;
-  const act = infos.filter(i => i.balance > 0.005).sort((a, b) => (a.dDue ?? 9e9) - (b.dDue ?? 9e9)), paid = infos.filter(i => i.balance <= 0.005);
-  h += act.length ? listBox(act.map(debtRow).join('')) : empty('landmark', 'Sin deudas pendientes.');
-  if (paid.length) h += secTitle('Liquidadas') + listBox(paid.map(debtRow).join(''));
+    <div class="text-[12px] text-zinc-400">Total por pagar</div><div class="text-[32px] leading-tight font-semibold tabular-nums tracking-tight text-rose-400">${fmt(total)}</div>
+    <div class="text-xs text-zinc-500 mt-0.5">${items.length} compromiso${items.length !== 1 ? 's' : ''} · deudas propias y tarjetas de crédito</div>
+    <div class="flex h-2.5 rounded-full bg-zinc-800 overflow-hidden mt-4">${seg(dOwed, 'bg-amber-500')}${seg(cDue, 'bg-rose-500')}${seg(cLater, 'bg-violet-400')}</div>
+    <div class="grid grid-cols-3 gap-2 mt-3">
+      ${[['Deudas propias', dOwed, 'bg-amber-500'], ['TDC este período', cDue, 'bg-rose-500'], ['TDC próximos meses', cLater, 'bg-violet-400']].map(([l, v, c]) => `<div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-2.5 min-w-0"><div class="flex items-start gap-1.5 text-[10px] text-zinc-500 leading-tight min-h-[26px]"><span class="w-2 h-2 mt-0.5 rounded-full shrink-0 ${c}"></span><span>${l}</span></div><div class="font-semibold tabular-nums text-[13px] mt-0.5 truncate">${fmt(v)}</div><div class="text-[10px] text-zinc-500 tabular-nums">${total > 0 ? Math.round(v / total * 100) : 0}%</div></div>`).join('')}
+    </div></div>`;
+  h += `<div class="flex items-center justify-between mt-6 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Desglose</h2><div class="flex gap-2">${btn('Pagar', 'newPay', 'hand-coins', '', 'ghost')}${btn('Deuda', 'newDebt')}</div></div>`;
+  if (items.length) {
+    const max = Math.max(...items.map(x => x.amount));
+    h += listBox([...items].sort((a, b) => b.amount - a.amount).map(x => `<button data-act="${x.act}" data-id="${x.id}" class="w-full text-left px-3.5 py-3.5 active:bg-zinc-800/60 block">
+      <div class="flex items-start gap-3">
+        <span class="w-9 h-9 shrink-0 rounded-xl grid place-items-center ${x.tone}">${icon(x.icon, 'w-[18px] h-[18px]')}</span>
+        <span class="flex-1 min-w-0"><span class="block font-medium leading-snug line-clamp-2 break-words">${esc(x.title)}</span><span class="block text-xs text-zinc-500 mt-0.5 leading-snug line-clamp-2">${esc(x.sub)}</span></span>
+        <span class="text-right shrink-0"><span class="block font-semibold tabular-nums">${fmt(x.amount)}</span><span class="block text-[11px] text-zinc-500 tabular-nums">${total > 0 ? (x.amount / total * 100).toFixed(1) : 0}% del total</span></span>
+      </div>
+      <div class="mt-2.5 pl-12">${`<div class="h-2 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${x.color}" style="width:${Math.max(2, x.amount / max * 100)}%"></div></div>`}</div>
+      <div class="flex items-center gap-1.5 mt-2 pl-12 flex-wrap">${x.badges}<span class="text-[11px] ${x.urgent ? 'text-amber-400' : 'text-zinc-500'} ml-auto">${esc(x.when)}</span></div>
+    </button>`).join(''));
+  } else h += empty('circle-check', 'No tienes nada por pagar.');
+  const paid = S.debts.map(debtInfo).filter(i => i.balance <= 0.005);
+  if (paid.length) h += secTitle('Deudas liquidadas') + listBox(paid.map(debtRow).join(''));
   const L = ledger().filter(x => x.t === 'debt' || (x.t === 'payment' && (x.kind === 'debt' || x.kind === 'card')));
   h += secTitle('Historial de pagos y deudas') + (L.length ? historyList(L) : empty('arrow-left-right', 'Sin pagos registrados.'));
   return h;
