@@ -7,13 +7,14 @@ Web App de una sola página (`index.html`) para iPhone (Safari → **Compartir �
 - **Moneda:** Pesos Mexicanos (MXN), formato `$10,000.00`.
 - **Sin datos precargados:** la app inicia vacía; todos los formularios inician en blanco.
 
-## Secciones
-- **Dashboard:** tarjetas de crédito y cuentas hasta arriba; luego balance, por cobrar, por pagar, stock, alertas, ventas del período e inventario activo.
-- **Tarjetas y Cuentas:** el *pago del período* se muestra separado de MSI, otros saldos diferidos y compras posteriores al corte (que pasan solas al pago del período en el siguiente corte).
-- **Inventario:** solo nombre/modelo libre y unidades disponibles.
-- **Ventas:** historial completo; cada venta descuenta unidades del inventario.
-- **Clientes** y **Créditos y Préstamos** (secciones independientes): sin plazos fijos; interés sobre saldo insoluto en cada fecha de corte, con % y día de corte modificables; abonos de cualquier monto.
-- **Ingresos y Gastos:** cada movimiento es un **Ingreso** (verde, `+`) o un **Gasto** (rojo, `−`). El balance del período muestra ingresos contra gastos y si sobró dinero o se gastó de más. Cada movimiento puede marcarse en **varios segmentos** a la vez (casillas de selección múltiple), creados libremente por el usuario; un mismo registro suma en cada segmento marcado sin duplicarse.
-- **Mis Deudas**, **Movimientos** (todo editable) y **Respaldo y Ajustes**.
+## Secciones (menú ☰)
+1. **Resumen:** tarjetas de crédito y cuentas hasta arriba; luego Balance total, Por cobrar (abre Clientes), Por pagar y Gastos del período; alertas, ventas del período e inventario activo.
+2. **Gastos:** cada movimiento es **Ingreso** (verde, `+`) o **Gasto** (rojo, `−`); balance del período y **segmentos** de selección múltiple creados por el usuario.
+3. **Tarjetas y Cuentas:** el *pago del período* va separado de MSI, saldos diferidos y compras posteriores al corte; historial de movimientos de cuentas y tarjetas.
+4. **Ventas:** pestañas *Ventas* (historial), *Por cobrar* (cuotas, créditos y préstamos, con abonos) e *Inventario* (nombre/modelo y unidades). Forma de pago: **Contado**, **Cuotas** (sin interés) o **Crédito / Préstamo** (con `%` de interés sobre saldo insoluto y día de corte). Los préstamos de dinero se registran aquí mismo.
+5. **Clientes:** tres vistas — *Tarjetas* (saldo actual, deuda total e historial), *Mayor deuda* y *A – Z*.
+6. **Deudas:** deudas propias + pago del período de tarjetas, con historial de pagos.
+
+El botón ⚙ del encabezado abre **Respaldo y Ajustes** (exportar/importar JSON). Las semanas van de domingo a sábado. Si la fecha se deja vacía se usa la de hoy.
 
 Cualquier registro puede editarse o eliminarse; todo se recalcula al momento. Los datos de versiones anteriores se migran automáticamente (las categorías pasan a ser segmentos). La versión instalada se ve en el menú ☰.
