@@ -102,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.7';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.8';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -159,7 +159,7 @@ function normalize(d) {
   d.credits.forEach(c => {
     if (!Array.isArray(c.rateLog) || !c.rateLog.length) c.rateLog = [{ date: c.date || today(), rate: +c.rate || 0 }];
     delete c.rate; delete c.months; delete c.dueDate;
-    if (c.mode !== 'cuotas' && c.mode !== 'credito') c.mode = c.rateLog.some(x => +x.rate > 0) ? 'credito' : 'cuotas';
+    if (!['cuotas', 'credito', 'contado'].includes(c.mode)) c.mode = c.rateLog.some(x => +x.rate > 0) ? 'credito' : 'cuotas';
     if (c.cutDay !== null && c.cutDay !== undefined) c.cutDay = validDay(c.cutDay);
     if (!c.saleId || !d.sales.some(x => x.id === c.saleId)) {
       const sl = { id: uid(), createdAt: c.createdAt || Date.now(), date: c.date || today(), productId: null, productName: c.concept || 'Venta a crédito',
@@ -235,7 +235,7 @@ function cleanLegacyDemo(d) {
 function load() { try { const d = JSON.parse(localStorage.getItem(LS)); if (d && typeof d === 'object') return normalize(d); } catch (e) {} return blank(); }
 let S = load();
 let UI = Object.assign({ view: 'dashboard', credF: 'activos', salesTab: 'historial', cliView: 'tarjetas', movLimit: 60,
-  segF: '', dashP: 'semana', dashO: 0, salesP: 'historico', salesO: 0, expP: 'semana', expO: 0 }, (() => { try { return JSON.parse(localStorage.getItem(LSUI)) || {}; } catch (e) { return {}; } })());
+  segSel: [], dashP: 'semana', dashO: 0, salesP: 'historico', salesO: 0, expP: 'semana', expO: 0 }, (() => { try { return JSON.parse(localStorage.getItem(LSUI)) || {}; } catch (e) { return {}; } })());
 UI.movLimit = 60;
 function persist() { try { localStorage.setItem(LS, JSON.stringify(S)); } catch (e) { toast('No se pudo guardar (almacenamiento lleno)', 'error'); } }
 function saveUI() { try { localStorage.setItem(LSUI, JSON.stringify(UI)); } catch (e) {} }
@@ -408,7 +408,7 @@ function ledger() {
   const L = [];
   S.sales.forEach(s => {
     const cr = s.creditId ? byId(S.credits, s.creditId) : null, out = cr?.accountId || null;
-    const payLbl = s.pay === 'cuotas' ? 'Cuotas' : s.pay === 'credito' ? 'Crédito' : '';
+    const payLbl = s.pay === 'cuotas' ? 'Cuotas' : s.pay === 'credito' ? 'Crédito' : s.creditId ? 'Contado parcial' : '';
     const acc = out || (s.pay === 'contado' ? s.accountId : null);
     L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, title: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`,
       sub: ['Venta', cliName(s.clientId), payLbl, accName(acc)].filter(Boolean).join(' · '),
@@ -424,7 +424,7 @@ function ledger() {
   });
   S.payments.forEach(p => {
     let title = 'Abono', sub = '', icon = 'hand-coins', tone = 'bg-sky-500/10 text-sky-400', sign = 1, client = null;
-    if (p.kind === 'credit') { const c = byId(S.credits, p.targetId); client = c?.clientId; title = `Abono · ${cliName(c?.clientId) || 'Cliente'}`; sub = c ? creditConcept(c) : ''; sign = p.accountId ? 1 : 0; }
+    if (p.kind === 'credit') { const c = byId(S.credits, p.targetId); client = c?.clientId; title = `${p.initial ? 'Pago' : 'Abono'} · ${cliName(c?.clientId) || 'Cliente'}`; sub = c ? creditConcept(c) : ''; sign = p.accountId ? 1 : 0; }
     else if (p.kind === 'debt') { const d = byId(S.debts, p.targetId); title = `Pago deuda · ${d?.creditor || ''}`; sub = d?.concept || ''; icon = 'landmark'; tone = 'bg-amber-500/10 text-amber-400'; sign = p.accountId ? -1 : 0; }
     else { const c = byId(S.cards, p.targetId); title = `Pago tarjeta · ${c?.name || ''}`; icon = 'credit-card'; tone = 'bg-violet-500/10 text-violet-300'; sign = p.accountId ? -1 : 0; }
     sub = [sub, accName(p.accountId)].filter(Boolean).join(' · ') || '—';
@@ -519,7 +519,7 @@ function accRow(a) {
 }
 function creditRow(i) {
   const c = i.c, pct = i.total > 0 ? i.paid / i.total * 100 : 0;
-  const meta = [creditConcept(c) || 'Venta', c.mode === 'cuotas' ? (i.nCuotas ? planTxt(i.nCuotas, i.freq, i.cuota) : 'Cuotas') : (i.rate > 0 ? `Crédito ${pct1(i.rate)}%` : 'Crédito')].filter(Boolean).map(esc).join(' · ');
+  const meta = [creditConcept(c) || 'Venta', c.mode === 'contado' ? 'Contado' : c.mode === 'cuotas' ? (i.nCuotas ? planTxt(i.nCuotas, i.freq, i.cuota) : 'Cuotas') : (i.rate > 0 ? `Crédito ${pct1(i.rate)}%` : 'Crédito')].filter(Boolean).map(esc).join(' · ');
   return `<button data-act="creditDetail" data-id="${c.id}" data-q="${esc((cliName(c.clientId) + ' ' + creditConcept(c)).toLowerCase())}" class="w-full text-left p-4 active:bg-zinc-800/60 block">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0"><div class="font-medium truncate">${esc(cliName(c.clientId) || 'Sin cliente')}</div><div class="text-xs text-zinc-500 truncate mt-0.5">${meta}</div></div>
@@ -896,71 +896,79 @@ function clientSummary(c) {
   const creds = S.credits.filter(x => x.clientId === c.id).map(creditInfo);
   return { c, creds, balance: r2(sum(creds, i => i.balance)), total: r2(sum(creds, i => i.total)), paid: r2(sum(creds, i => i.paid)) };
 }
+/* Historial del cliente en orden cronológico con saldo después de cada movimiento:
+   cargos (ventas a cuotas, crédito o contado con saldo), intereses generados y abonos; las ventas pagadas completas no cambian el saldo. */
 function clientMoves(id) {
   const L = [];
-  S.sales.filter(s => s.clientId === id).forEach(s => { const cash = s.pay === 'contado';
-    L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, concept: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`,
-      label: cash ? 'Venta de contado' : s.pay === 'cuotas' ? 'Venta a cuotas' : 'Venta a crédito', amount: s.total, tone: cash ? 'text-zinc-300' : 'text-amber-300' }); });
-  S.payments.filter(p => p.kind === 'credit').forEach(p => { const c = byId(S.credits, p.targetId); if (!c || c.clientId !== id) return;
-    L.push({ t: 'payment', id: p.id, date: p.date, cr: p.createdAt || 0, concept: creditConcept(c) || 'Abono', label: 'Abono', amount: p.amount, tone: 'text-emerald-400' }); });
-  return L.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.cr - a.cr));
+  S.credits.filter(c => c.clientId === id).forEach(c => {
+    const sl = byId(S.sales, c.saleId), i = creditInfo(c), concept = creditConcept(c) || 'Venta';
+    L.push({ t: 'sale', id: sl ? sl.id : c.id, date: c.date, cr: c.createdAt || 0, ord: 0, concept, label: c.mode === 'cuotas' ? 'Venta a cuotas' : c.mode === 'contado' ? 'Venta de contado' : 'Venta a crédito', amount: +c.principal || 0, kind: 'charge' });
+    i.ev.forEach(e => L.push({ t: 'credit', id: c.id, date: e.date, cr: 0, ord: 1, concept, label: `Interés ${pct1(e.rate)}%`, amount: e.amt, kind: 'charge' }));
+    i.pays.forEach(p => L.push({ t: 'payment', id: p.id, date: p.date, cr: p.createdAt || 0, ord: 2, concept, label: p.initial ? 'Pago al vender' : 'Abono', amount: +p.amount || 0, kind: 'pay' }));
+  });
+  S.sales.filter(s => s.clientId === id && !s.creditId).forEach(s => L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, ord: 0, concept: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`, label: 'Venta de contado · pagada', amount: s.total, kind: 'neutral' }));
+  L.sort((a, b) => (a.date || '').localeCompare(b.date || '') || a.ord - b.ord || a.cr - b.cr);
+  let bal = 0; L.forEach(m => { bal = r2(bal + (m.kind === 'charge' ? m.amount : m.kind === 'pay' ? -m.amount : 0)); m.bal = Math.max(0, bal); });
+  return L.reverse();
 }
 const moveRow = m => `<button data-act="editRec" data-t="${m.t}" data-id="${m.id}" class="w-full flex items-center justify-between gap-3 py-2.5 text-left active:opacity-70">
   <span class="min-w-0"><span class="block text-[13px] text-zinc-200 truncate">${esc(m.concept)}</span><span class="block text-[11px] text-zinc-500">${fmtD(m.date)} · ${m.label}</span></span>
-  <span class="tabular-nums text-[13px] font-medium shrink-0 ${m.tone}">${m.label === 'Abono' ? '−' : ''}${fmt(m.amount)}</span></button>`;
+  <span class="text-right shrink-0"><span class="block tabular-nums text-[13px] font-medium ${m.kind === 'pay' ? 'text-emerald-400' : m.kind === 'charge' ? 'text-amber-300' : 'text-zinc-300'}">${m.kind === 'pay' ? '−' : m.kind === 'charge' ? '+' : ''}${fmt(m.amount)}</span><span class="block text-[10px] text-zinc-500 tabular-nums">Saldo ${fmt(m.bal)}</span></span></button>`;
 const avatar = (n, cls = 'w-10 h-10 text-sm') => `<span class="${cls} shrink-0 rounded-full grid place-items-center bg-zinc-800 text-zinc-300 font-semibold">${esc(initials(n))}</span>`;
+function clientCard(x, rank) {
+  const mv = x.mv, pct = x.total > 0 ? x.paid / x.total * 100 : 0, active = x.creds.find(i => i.balance > 0.005), open = (UI.cliOpen || []).includes(x.c.id);
+  return `<div data-q="${esc((x.c.name + ' ' + (x.c.phone || '')).toLowerCase())}" class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
+    <button data-act="clientDetail" data-id="${x.c.id}" class="w-full flex items-center gap-3 text-left">${avatar(x.c.name)}<span class="flex-1 min-w-0"><span class="flex items-center gap-2"><span class="font-semibold truncate">${esc(x.c.name)}</span>${rank ? `<span class="shrink-0 text-[11px] font-semibold text-sky-300 bg-sky-500/10 rounded px-1.5">#${rank}</span>` : ''}</span><span class="block text-xs text-zinc-500 truncate">${x.c.phone ? esc(x.c.phone) + ' · ' : ''}${mv.length} movimiento${mv.length !== 1 ? 's' : ''}</span></span>${icon('chevron-right', 'w-4 h-4 text-zinc-600 shrink-0')}</button>
+    <div class="grid grid-cols-2 gap-3 mt-4">
+      <div class="min-w-0"><div class="text-[11px] text-zinc-500">Saldo actual</div><div class="${bigCls(fmt(x.balance))} leading-tight font-semibold tabular-nums tracking-tight truncate ${x.balance > 0.005 ? 'text-sky-400' : 'text-zinc-300'}">${fmt(x.balance)}</div></div>
+      <div class="min-w-0 text-right"><div class="text-[11px] text-zinc-500">Deuda total</div><div class="${bigCls(fmt(x.total))} leading-tight font-semibold tabular-nums tracking-tight truncate">${fmt(x.total)}</div></div>
+    </div>
+    <div class="mt-3">${progress(pct)}</div>
+    <div class="flex justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums"><span>Abonado ${fmt(x.paid)}</span><span>${x.total > 0 ? Math.round(pct) + '% pagado' : 'Sin adeudos'}</span></div>
+    ${mv.length ? `<div class="mt-3 pt-1 border-t border-zinc-800/80"><div class="text-[11px] font-semibold uppercase tracking-[.08em] text-zinc-500 pt-2">Historial</div><div class="divide-y divide-zinc-800/60">${(open ? mv : mv.slice(0, 5)).map(moveRow).join('')}</div></div>
+      ${mv.length > 5 ? `<button data-act="cliExpand" data-id="${x.c.id}" class="w-full pt-2 text-[12px] text-emerald-400 text-left">${open ? 'Ver menos' : `Ver historial completo (${mv.length})`}</button>` : ''}` : '<div class="mt-3 text-xs text-zinc-500">Sin movimientos.</div>'}
+    <div class="grid ${active ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-3">${actBtn('Venta', 'newSale', 'shopping-bag', `data-client="${x.c.id}"`)}${active ? actBtn('Abonar', 'newPay', 'hand-coins', `data-kind="credit" data-target="${active.c.id}"`) : ''}</div>
+  </div>`;
+}
 R.clientes = () => {
-  const mode = ['tarjetas', 'deuda', 'az'].includes(UI.cliView) ? UI.cliView : 'tarjetas';
-  const all = S.clients.map(clientSummary);
-  let h = viewTabs([['tarjetas', 'Tarjetas'], ['deuda', 'Mayor deuda'], ['az', 'A – Z']], mode, 'cliView');
+  const mode = ['deuda', 'az', 'reciente'].includes(UI.cliView) ? UI.cliView : 'deuda';
+  const all = S.clients.map(c => { const x = clientSummary(c); x.mv = clientMoves(c.id); x.last = x.mv[0]?.date || ''; return x; });
+  let h = viewTabs([['deuda', 'Mayor deuda'], ['az', 'A – Z'], ['reciente', 'Recientes']], mode, 'cliView');
   h += `<div class="grid grid-cols-3 gap-2 mt-4">${kv('Por cobrar', fmt(sum(all, x => x.balance)), 'text-[13px] text-sky-400')}${kv('Clientes', fmtInt(all.length), 'text-[13px]')}${kv('Con adeudo', fmtInt(all.filter(x => x.balance > 0.005).length), 'text-[13px]')}</div>`;
   h += `<div class="flex gap-2 mt-4">${searchBox('cliList', 'Buscar')}${btn('Nuevo', 'newClient', 'user-plus')}</div>`;
   if (!all.length) return h + `<div class="mt-4">${empty('users', 'Sin clientes registrados.')}</div>`;
-  const q = x => `data-q="${esc((x.c.name + ' ' + (x.c.phone || '')).toLowerCase())}"`;
-  if (mode === 'tarjetas') {
-    h += `<div id="cliList" class="mt-3 space-y-3">${[...all].sort((a, b) => byName(a.c, b.c)).map(x => {
-      const mv = clientMoves(x.c.id), pct = x.total > 0 ? x.paid / x.total * 100 : 0, active = x.creds.find(i => i.balance > 0.005);
-      return `<div ${q(x)} class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
-        <button data-act="clientDetail" data-id="${x.c.id}" class="w-full flex items-center gap-3 text-left">${avatar(x.c.name)}<span class="flex-1 min-w-0"><span class="block font-semibold truncate">${esc(x.c.name)}</span><span class="block text-xs text-zinc-500 truncate">${x.c.phone ? esc(x.c.phone) + ' · ' : ''}${mv.length} movimiento${mv.length !== 1 ? 's' : ''}</span></span>${icon('chevron-right', 'w-4 h-4 text-zinc-600 shrink-0')}</button>
-        <div class="grid grid-cols-2 gap-3 mt-4">
-          <div class="min-w-0"><div class="text-[11px] text-zinc-500">Saldo actual</div><div class="${bigCls(fmt(x.balance))} leading-tight font-semibold tabular-nums tracking-tight truncate ${x.balance > 0.005 ? 'text-sky-400' : 'text-zinc-300'}">${fmt(x.balance)}</div></div>
-          <div class="min-w-0 text-right"><div class="text-[11px] text-zinc-500">Deuda total</div><div class="${bigCls(fmt(x.total))} leading-tight font-semibold tabular-nums tracking-tight truncate">${fmt(x.total)}</div></div>
-        </div>
-        <div class="mt-3">${progress(pct)}</div>
-        <div class="flex justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums"><span>Abonado ${fmt(x.paid)}</span><span>${x.total > 0 ? Math.round(pct) + '% pagado' : 'Sin adeudos'}</span></div>
-        ${mv.length ? `<div class="mt-3 pt-1 border-t border-zinc-800/80 divide-y divide-zinc-800/60">${mv.slice(0, 4).map(moveRow).join('')}</div>${mv.length > 4 ? `<button data-act="clientDetail" data-id="${x.c.id}" class="w-full pt-2 text-[12px] text-emerald-400 text-left">Ver historial completo (${mv.length})</button>` : ''}` : '<div class="mt-3 text-xs text-zinc-500">Sin movimientos.</div>'}
-        <div class="grid ${active ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-3">${actBtn('Venta', 'newSale', 'shopping-bag', `data-client="${x.c.id}"`)}${active ? actBtn('Abonar', 'newPay', 'hand-coins', `data-kind="credit" data-target="${active.c.id}"`) : ''}</div>
-      </div>`;
-    }).join('')}</div>`;
-  } else if (mode === 'deuda') {
-    const L = [...all].sort((a, b) => (b.balance - a.balance) || byName(a.c, b.c)), max = Math.max(0.01, ...L.map(x => x.balance));
-    h += `<div class="mt-3">${listBox(L.map((x, k) => `<button data-act="clientDetail" data-id="${x.c.id}" ${q(x)} class="w-full px-3.5 py-3 text-left active:bg-zinc-800/60 block">
-      <div class="flex items-center gap-3"><span class="w-6 text-[12px] text-zinc-500 tabular-nums shrink-0">${k + 1}</span><span class="flex-1 min-w-0 truncate">${esc(x.c.name)}</span><span class="font-semibold tabular-nums shrink-0 ${x.balance > 0.005 ? 'text-sky-400' : 'text-zinc-500'}">${fmt(x.balance)}</span></div>
-      <div class="mt-2 pl-9">${progress(x.balance / max * 100, 'bg-sky-500/80')}</div></button>`).join(''), 'cliList')}</div>`;
-  } else {
-    const L = [...all].sort((a, b) => byName(a.c, b.c)); let cur = null, buf = '', out = '';
+  if (mode === 'az') {
     const letter = n => (String(n || '#').trim().normalize('NFD').replace(/[̀-ͯ]/g, '')[0] || '#').toUpperCase();
-    const flush = () => { if (cur !== null) out += `<div data-group class="mb-3"><div class="text-[12px] font-semibold text-zinc-500 mb-1.5 px-1">${esc(cur)}</div>${listBox(buf)}</div>`; };
-    L.forEach(x => { const l = letter(x.c.name); if (l !== cur) { flush(); cur = l; buf = ''; }
-      buf += `<button data-act="clientDetail" data-id="${x.c.id}" ${q(x)} class="w-full flex items-center gap-3 px-3.5 py-3 text-left active:bg-zinc-800/60">${avatar(x.c.name)}<span class="flex-1 min-w-0"><span class="block truncate">${esc(x.c.name)}</span>${x.c.phone ? `<span class="block text-xs text-zinc-500 truncate">${esc(x.c.phone)}</span>` : ''}</span><span class="text-right shrink-0">${x.balance > 0.005 ? `<span class="block font-semibold tabular-nums text-sky-400">${fmt(x.balance)}</span>` : badge('Al corriente', 'ok')}</span></button>`; });
+    let cur = null, buf = '', out = '';
+    const flush = () => { if (cur !== null) out += `<div data-group class="mb-4"><div class="text-[12px] font-semibold text-zinc-500 mb-1.5 px-1">${esc(cur)}</div><div class="space-y-3">${buf}</div></div>`; };
+    [...all].sort((a, b) => byName(a.c, b.c)).forEach(x => { const l = letter(x.c.name); if (l !== cur) { flush(); cur = l; buf = ''; } buf += clientCard(x); });
     flush();
-    h += `<div id="cliList" class="mt-3">${out}</div>`;
+    return h + `<div id="cliList" class="mt-3">${out}</div>`;
   }
-  return h;
+  const L = mode === 'deuda' ? [...all].sort((a, b) => (b.balance - a.balance) || (b.total - a.total) || byName(a.c, b.c))
+    : [...all].sort((a, b) => (b.last || '').localeCompare(a.last || '') || byName(a.c, b.c));
+  return h + `<div id="cliList" class="mt-3 space-y-3">${L.map((x, k) => clientCard(x, mode === 'deuda' && x.balance > 0.005 ? k + 1 : 0)).join('')}</div>`;
 };
 
+function segFilterChips(sel, hasNone) {
+  const items = [...S.segments].sort(byName).map(x => [x.id, esc(x.name)]); if (hasNone) items.push(['__none', 'Sin segmento']);
+  return `<div class="flex gap-1.5 overflow-x-auto no-scrollbar -mx-4 px-4">${items.map(([v, l]) => { const a = sel.includes(v);
+    return `<button data-act="toggleSeg" data-v="${v}" aria-pressed="${a}" class="shrink-0 h-8 pl-2.5 pr-3.5 rounded-full text-[13px] font-medium border inline-flex items-center gap-1.5 transition ${a ? 'bg-emerald-500/15 text-emerald-200 border-emerald-500/50' : 'bg-zinc-900 text-zinc-400 border-zinc-800'}"><span class="w-3.5 h-3.5 shrink-0 rounded-full border grid place-items-center ${a ? 'border-emerald-400' : 'border-zinc-600'}">${a ? '<span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>' : ''}</span>${l}</button>`; }).join('')}
+    ${sel.length ? `<button data-act="clearSeg" class="shrink-0 h-8 px-3 rounded-full text-[13px] text-zinc-400 border border-dashed border-zinc-700">Quitar filtros</button>` : ''}</div>`;
+}
 R.gastos = () => {
   const r = range(UI.expP, UI.expO);
-  if (UI.segF && UI.segF !== '__none' && !byId(S.segments, UI.segF)) UI.segF = '';
-  const f = UI.segF || '';
-  const inSeg = e => !f || (f === '__none' ? !(e.segmentIds || []).length : (e.segmentIds || []).includes(f));
+  UI.segSel = (Array.isArray(UI.segSel) ? UI.segSel : []).filter(v => v === '__none' || byId(S.segments, v));
+  const sel = UI.segSel, on = sel.length > 0;
+  // Se muestran solo los movimientos que pertenecen a alguno de los segmentos activados (sin duplicar)
+  const inSeg = e => { if (!on) return true; const ids = e.segmentIds || []; return ids.length ? ids.some(v => sel.includes(v)) : sel.includes('__none'); };
   const P = S.expenses.filter(e => inRange(e.date, r));
   const L = P.filter(inSeg);
   const inc = sum(L.filter(isInc), e => e.amount), out = sum(L.filter(e => !isInc(e)), e => e.amount), net = r2(inc - out);
-  const segLabel = !f ? 'Todos los movimientos' : f === '__none' ? 'Sin segmento' : byId(S.segments, f).name;
+  const segLabel = !on ? 'Todos los movimientos' : sel.map(v => v === '__none' ? 'Sin segmento' : byId(S.segments, v).name).join(' + ');
   let h = periodBar('exp');
   const hasNone = S.expenses.some(e => !(e.segmentIds || []).length);
-  if (S.segments.length) h += `<div class="mt-3">${chips([['', 'Todos'], ...[...S.segments].sort(byName).map(x => [x.id, esc(x.name)]), ...(hasNone ? [['__none', 'Sin segmento']] : [])], f, 'setUI', 'segF')}</div>`;
+  if (S.segments.length) h += `<div class="mt-3">${segFilterChips(sel, hasNone)}</div>`;
   // Balance del período: ingresos frente a gastos
   h += `<div class="mt-3 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
     <div class="text-[12px] text-zinc-400 truncate">${esc(segLabel)} · ${esc(r.label)}</div>
@@ -972,7 +980,7 @@ R.gastos = () => {
     </div>
     ${inc > 0 ? `<div class="mt-3">${progress(out / inc * 100, out > inc ? 'bg-rose-500' : 'bg-emerald-500')}<div class="text-[11px] text-zinc-500 mt-1.5">Gastado ${Math.round(out / inc * 100)}% de los ingresos</div></div>` : ''}
   </div>`;
-  const segData = f && f !== '__none' ? `data-seg="${f}"` : '';
+  const segData = on ? `data-seg="${sel.filter(v => v !== '__none').join(',')}"` : '';
   h += `<div class="grid grid-cols-2 gap-2 mt-3">
     <button data-act="newMov" data-type="ingreso" ${segData} class="h-12 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold inline-flex items-center justify-center gap-2 active:opacity-80"><span class="text-xl leading-none">+</span>Ingreso</button>
     <button data-act="newMov" data-type="gasto" ${segData} class="h-12 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 font-semibold inline-flex items-center justify-center gap-2 active:opacity-80"><span class="text-xl leading-none">−</span>Gasto</button>
@@ -983,18 +991,19 @@ R.gastos = () => {
     h += listBox([...S.segments].sort(byName).map(x => {
       const M = P.filter(e => (e.segmentIds || []).includes(x.id));
       const si = sum(M.filter(isInc), e => e.amount), so = sum(M.filter(e => !isInc(e)), e => e.amount), sn = r2(si - so);
-      return `<div class="flex items-center gap-2 pl-3.5 pr-2 py-3 ${f === x.id ? 'bg-zinc-800/60' : ''}">
-        <button data-act="setUI" data-k="segF" data-v="${f === x.id ? '' : x.id}" class="flex-1 min-w-0 text-left">
-          <span class="flex items-center gap-2"><span class="w-2 h-2 shrink-0 rounded-full ${f === x.id ? 'bg-emerald-400' : 'bg-zinc-600'}"></span><span class="truncate">${esc(x.name)}</span><span class="text-[11px] text-zinc-500 shrink-0">${M.length} mov.</span></span>
+      const a = sel.includes(x.id);
+      return `<div class="flex items-center gap-2 pl-3.5 pr-2 py-3 ${a ? 'bg-emerald-500/[.06]' : ''}">
+        <button data-act="toggleSeg" data-v="${x.id}" aria-pressed="${a}" class="flex-1 min-w-0 text-left">
+          <span class="flex items-center gap-2"><span class="w-2 h-2 shrink-0 rounded-full ${a ? 'bg-emerald-400' : 'bg-zinc-600'}"></span><span class="truncate">${esc(x.name)}</span><span class="text-[11px] text-zinc-500 shrink-0">${M.length} mov.</span></span>
           <span class="block text-xs tabular-nums mt-0.5 truncate"><span class="text-emerald-400">+${fmt(si)}</span> <span class="text-zinc-600">·</span> <span class="text-rose-400">−${fmt(so)}</span></span>
         </button>
         <span class="font-semibold tabular-nums text-sm shrink-0 ${sn > 0.005 ? 'text-emerald-400' : sn < -0.005 ? 'text-rose-400' : 'text-zinc-400'}">${signed(sn)}</span>
         <button data-act="editSegment" data-id="${x.id}" aria-label="Editar segmento" class="w-9 h-9 shrink-0 rounded-lg grid place-items-center text-zinc-500 active:bg-zinc-800">${icon('pencil', 'w-4 h-4')}</button>
       </div>`;
     }).join(''));
-    h += `<div class="text-[11px] text-zinc-500 mt-2 px-1">Totales del período. Un movimiento con varios segmentos suma en cada uno.</div>`;
+    h += `<div class="text-[11px] text-zinc-500 mt-2 px-1">Toca los segmentos para combinarlos en el balance. Cada fila muestra sus propios totales del período.</div>`;
   } else h += empty('tags', 'Sin segmentos creados.');
-  h += secTitle(f ? `Registros · ${esc(segLabel)}` : 'Registros');
+  h += secTitle(on ? `Registros · ${esc(segLabel)}` : 'Registros');
   const LL = ledger().filter(x => x.t === 'expense' && inRange(x.date, r) && inSeg(byId(S.expenses, x.id)));
   h += LL.length ? groupedLedger(LL) : empty('arrow-up-down', 'Sin movimientos en este período.');
   return h;
@@ -1083,6 +1092,11 @@ function saleForm(id, preset = {}) {
   const avail = p => stock(p) + (s && s.productId === p.id ? s.qty : 0);
   const prods = S.products.filter(p => avail(p) > 0 || p.id === s?.productId).sort(byName);
   const pid = s ? (byId(S.products, s.productId) ? s.productId : '__free') : (preset.productId || '');
+  // Contado: lo recibido al vender (pago inicial) y lo abonado después
+  const initP = cr ? S.payments.find(p => p.kind === 'credit' && p.targetId === cr.id && p.initial) : null;
+  const later = cr ? r2(sum(paysFor('credit', cr.id).filter(p => !p.initial), p => p.amount)) : 0;
+  const recVal = s && s.pay === 'contado' ? (s.creditId ? (initP ? initP.amount : '') : s.total) : '';
+  const recAcc = s && s.pay === 'contado' ? (s.creditId ? (initP?.accountId || '') : (s.accountId || '')) : defaultAcc();
   openSheet({
     title: s ? 'Editar venta' : 'Nueva venta', submit: s ? 'Guardar cambios' : 'Registrar venta', exists: () => !id || !!byId(S.sales, id),
     body: () => `
@@ -1092,7 +1106,11 @@ function saleForm(id, preset = {}) {
       ${fld('Monto', money('total', s ? s.total : ''))}
       ${clientField(s?.clientId || preset.clientId || '')}
       ${fld('Forma de pago', paySeg(s?.pay || ''))}
-      <div data-show="pay=contado">${fld('Cuenta destino', sel('accountId', accOpts(), s && s.pay === 'contado' ? (s.accountId || '') : defaultAcc()))}</div>
+      <div data-show="pay=contado">
+        ${fld('Monto recibido', `<div class="flex gap-2"><div class="flex-1 min-w-0">${money('received', recVal)}</div><button type="button" data-act="fillReceived" class="h-12 px-3 rounded-xl bg-zinc-800 text-[13px] font-semibold shrink-0 active:bg-zinc-700">Pagó completo</button></div>`, '<span id="recInfo"></span>')}
+        <span id="laterPaid" data-v="${later}" hidden></span>
+        ${fld('Cuenta destino', sel('accountId', accOpts(), recAcc))}
+      </div>
       <div data-show="pay=cuotas">${cuotasFields(cr)}</div>
       <div data-show="pay=credito">${interestFields(cr)}</div>
       ${cr ? `<div class="text-xs text-zinc-500 -mt-1 mb-4">Abonado hasta hoy: ${fmt(creditInfo(cr).paid)}</div>` : ''}
@@ -1105,6 +1123,10 @@ function saleForm(id, preset = {}) {
       const ok = FREQ_ADJ[fr] && n >= 1 && t > 0;
       pv.classList.toggle('hidden', !ok);
       if (ok) pv.innerHTML = `${planTxt(n, fr, r2(t / n)).replace(/de (\$[\d,.]+)$/, 'de <b class="text-white tabular-nums">$1</b>')}`;
+      const rv = E.received.value.trim(), pend = r2(t - num(rv) - later), ri = f.querySelector('#recInfo');
+      ri.innerHTML = !(t > 0) ? '' : rv === '' && !later ? `Saldo pendiente: <b class="text-rose-300 tabular-nums">${fmt(t)}</b>`
+        : pend < -0.005 ? `<span class="text-rose-400">Lo recibido excede el monto de la venta</span>`
+        : pend > 0.005 ? `Saldo pendiente: <b class="text-rose-300 tabular-nums">${fmt(pend)}</b>${later ? ` · abonado después ${fmt(later)}` : ''}` : `<span class="text-emerald-400">Pagada completa</span>`;
     },
     async onSubmit(f) {
       if (!f.productId) return err('Selecciona un producto o "Venta sin inventario"');
@@ -1119,24 +1141,37 @@ function saleForm(id, preset = {}) {
       if (!pay) return err('Elige la forma de pago');
       if (f.clientId === '__new' && !(f.newClient || '').trim()) return err('Escribe el nombre del nuevo cliente');
       if (pay !== 'contado' && !f.clientId) return err('Selecciona el cliente');
+      const received = r2(num(f.received));
+      let full = false;
+      if (pay === 'contado') {
+        if (received < 0) return err('Monto recibido inválido');
+        if (received + later > total + 0.005) return err(`Lo recibido excede el monto de la venta (máximo ${fmt(Math.max(0, total - later))})`);
+        full = received + later >= total - 0.005 && later < 0.005;
+        if (!full && !f.clientId) return err('Selecciona el cliente para registrar el saldo pendiente');
+      }
       if (pay === 'cuotas') { const t = cuotasCheck(f); if (t) return err(t); }
       if (pay === 'credito') { const t = termsCheck(f); if (t) return err(t); }
-      if (s && s.creditId && pay === 'contado') {
-        const np = paysFor('credit', s.creditId).length;
-        if (np && !await confirmDlg('Cambiar a contado', `Esta venta tiene ${np} abono(s). Se eliminarán al cambiar a contado.`, 'Continuar')) return false;
-      }
       const clientId = resolveClient(f);
       const rec = s || { id: uid(), createdAt: Date.now() };
       Object.assign(rec, { date: f.date || today(), productId: p ? p.id : null, productName: p ? p.name : f.concept.trim(), qty, total, clientId,
         pay, accountId: pay === 'contado' ? (f.accountId || null) : null });
       delete rec.kind;
-      if (pay !== 'contado') {
+      if (pay === 'contado' && full) { if (rec.creditId) removeCreditData(rec.creditId); rec.creditId = null; rec.accountId = f.accountId || null; }
+      else {
+        // Cuotas, crédito o contado con saldo pendiente: se registra como cuenta por cobrar
+        rec.accountId = null;
         let c = byId(S.credits, rec.creditId), isNew = false;
         if (!c) { c = { id: uid(), createdAt: Date.now(), saleId: rec.id, concept: '', accountId: null }; S.credits.push(c); rec.creditId = c.id; isNew = true; }
         Object.assign(c, { clientId, principal: total, date: rec.date, type: 'venta' });
-        termsApply(c, f, isNew, pay);
-      } else if (rec.creditId) { removeCreditData(rec.creditId); rec.creditId = null; }
+        if (pay === 'contado') {
+          Object.assign(c, { mode: 'contado', rateLog: [{ date: rec.date, rate: 0 }], cutDay: null }); delete c.inst;
+          let ip = S.payments.find(p => p.kind === 'credit' && p.targetId === c.id && p.initial);
+          if (received > 0.005) { if (!ip) { ip = { id: uid(), createdAt: Date.now(), kind: 'credit', targetId: c.id, initial: true }; S.payments.push(ip); } Object.assign(ip, { amount: received, date: rec.date, accountId: f.accountId || null }); }
+          else if (ip) S.payments = S.payments.filter(p => p !== ip);
+        } else termsApply(c, f, isNew, pay);
+      }
       if (!s) S.sales.push(rec);
+      if (pay === 'contado' && !full) { const b = creditInfo(byId(S.credits, rec.creditId)).balance; return `${s ? 'Venta actualizada' : 'Venta registrada'} · pendiente ${fmt(b)}`; }
       return s ? 'Venta actualizada' : `Venta registrada · ${fmt(total)}`;
     },
     onDelete: s ? async () => {
@@ -1225,7 +1260,7 @@ function typeToggle(v) {
 function movForm(id, preset = {}) {
   const x = id ? byId(S.expenses, id) : null;
   const type = x ? x.type : (preset.type || '');
-  const selSegs = x ? (x.segmentIds || []) : (preset.segId ? [preset.segId] : []);
+  const selSegs = x ? (x.segmentIds || []) : (preset.segIds || []);
   const mG = x && !isInc(x) ? (x.cardId ? 'card:' + x.cardId : x.accountId ? 'acc:' + x.accountId : '') : (preset.cardId ? 'card:' + preset.cardId : (defaultAcc() ? 'acc:' + defaultAcc() : ''));
   const mI = x && isInc(x) ? (x.accountId ? 'acc:' + x.accountId : '') : (defaultAcc() ? 'acc:' + defaultAcc() : '');
   openSheet({
@@ -1318,7 +1353,7 @@ function segmentForm(id) {
       const n = S.expenses.filter(e => (e.segmentIds || []).includes(g.id)).length;
       if (!await confirmDlg('Eliminar segmento', `¿Eliminar "${g.name}"?${n ? ` Se quitará de ${n} movimiento(s); los movimientos se conservan.` : ''}`)) return false;
       S.segments = S.segments.filter(k => k.id !== g.id); S.expenses.forEach(e => { e.segmentIds = (e.segmentIds || []).filter(v => v !== g.id); });
-      if (UI.segF === g.id) UI.segF = '';
+      UI.segSel = (UI.segSel || []).filter(v => v !== g.id);
     } : null,
   });
 }
@@ -1424,7 +1459,7 @@ const payRows = pays => pays.length ? listBox([...pays].reverse().map(p => `<but
 
 function creditDetail(id) {
   openSheet({
-    title: byId(S.credits, id)?.mode === 'cuotas' ? 'Venta a cuotas' : 'Venta a crédito', exists: () => !!byId(S.credits, id),
+    title: ({ cuotas: 'Venta a cuotas', contado: 'Venta de contado' })[byId(S.credits, id)?.mode] || 'Venta a crédito', exists: () => !!byId(S.credits, id),
     body: () => {
       const c = byId(S.credits, id); if (!c) return ''; const i = creditInfo(c);
       const log = rateLogSorted(c);
@@ -1435,12 +1470,12 @@ function creditDetail(id) {
           <div class="flex justify-center gap-1.5 mt-3">${statusBadge(i)}${i.overdueQ ? badge('Atrasado', 'bad') : ''}</div>
         </div>
         <div class="mb-4">${progress(i.total > 0 ? i.paid / i.total * 100 : 0)}</div>
-        <div class="grid grid-cols-2 gap-2">${c.mode === 'cuotas'
+        <div class="grid grid-cols-2 gap-2">${c.mode === 'contado' ? `${kv('Monto de la venta', fmt(i.P))}${kv('Pagado', fmt(i.paid), 'text-emerald-400')}` : c.mode === 'cuotas'
           ? `${kv('Monto de la venta', fmt(i.P))}${kv('Por cuota', i.cuota ? fmt(i.cuota) : '—')}${kv('Cuotas cubiertas', i.nCuotas ? `${i.covered} de ${i.nCuotas}` : '—')}${kv('Abonado', fmt(i.paid), 'text-emerald-400')}`
           : `${kv('Monto original', fmt(i.P))}${kv('Intereses generados', fmt(i.interest), 'text-amber-400')}${kv('Total', fmt(i.total))}${kv('Abonado', fmt(i.paid), 'text-emerald-400')}`}</div>
         <div class="grid ${i.balance > 0.005 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-4">${i.balance > 0.005 ? actBtn('Registrar abono', 'newPay', 'hand-coins', `data-kind="credit" data-target="${c.id}"`, true) : ''}${actBtn('Editar venta', 'editCredit', 'pencil', `data-id="${c.id}"`)}</div>
         <div class="mt-4 divide-y divide-zinc-800/70">
-          ${row('Forma de pago', c.mode === 'cuotas' ? 'Cuotas (sin interés)' : 'Crédito')}
+          ${row('Forma de pago', c.mode === 'cuotas' ? 'Cuotas (sin interés)' : c.mode === 'contado' ? 'Contado (con saldo pendiente)' : 'Crédito')}
           ${i.nCuotas ? row('Plan', planTxt(i.nCuotas, i.freq, i.cuota)) : ''}
           ${i.nextDue ? row(i.overdueQ ? 'Cuota atrasada' : 'Próxima cuota', `<span class="${i.overdueQ ? 'text-rose-400' : ''}">${fmtD(i.nextDue)}</span> <span class="text-zinc-500">(${dayWord(i.dNextDue)})</span>`) : ''}
           ${creditConcept(c) ? row('Concepto', esc(creditConcept(c))) : ''}
@@ -1586,7 +1621,7 @@ const A = {
     el.setAttribute('aria-pressed', String(UI.payFlip));
     const [f, b] = el.querySelectorAll('.flip-face'); f.setAttribute('aria-hidden', String(UI.payFlip)); b.setAttribute('aria-hidden', String(!UI.payFlip));
   },
-  goExp: () => { UI.view = 'gastos'; UI.expP = UI.dashP; UI.expO = UI.dashO; UI.segF = ''; renderAll(); window.scrollTo(0, 0); },
+  goExp: () => { UI.view = 'gastos'; UI.expP = UI.dashP; UI.expO = UI.dashO; UI.segSel = []; renderAll(); window.scrollTo(0, 0); },
   setUI: d => { UI[d.k] = d.v; renderAll(); },
   setPeriod: d => { UI[d.k + 'P'] = d.v; UI[d.k + 'O'] = 0; renderAll(); },
   periodNav: d => { UI[d.k + 'O'] = Math.min(0, (UI[d.k + 'O'] || 0) + (+d.v)); renderAll(); },
@@ -1599,10 +1634,13 @@ const A = {
   sellProduct: d => saleForm(null, { productId: d.id }),
   newSale: d => saleForm(null, { clientId: d.client }), editSale: d => saleForm(d.id),
   newClient: () => clientForm(), editClient: d => clientForm(d.id), clientDetail: d => clientDetail(d.id),
+  cliExpand: d => { const st = new Set(UI.cliOpen || []); st.has(d.id) ? st.delete(d.id) : st.add(d.id); UI.cliOpen = [...st]; renderAll(); },
   editCredit: d => { const c = byId(S.credits, d.id); if (c?.saleId) saleForm(c.saleId); }, creditDetail: d => creditDetail(d.id),
   delCredit: async d => { if (await delCredit(d.id)) { persist(); closeSheet(); renderAll(); toast('Eliminado'); } },
   newPay: d => payForm(null, { kind: d.kind, targetId: d.target }), editPay: d => payForm(d.id),
-  newMov: d => movForm(null, { type: d.type, segId: d.seg }), newExpense: d => movForm(null, { type: 'gasto', cardId: d.card, msi: d.msi === '1' }), editExpense: d => movForm(d.id),
+  newMov: d => movForm(null, { type: d.type, segIds: d.seg ? d.seg.split(',').filter(Boolean) : [] }),
+  toggleSeg: d => { const st = new Set(UI.segSel || []); st.has(d.v) ? st.delete(d.v) : st.add(d.v); UI.segSel = [...st]; renderAll(); },
+  clearSeg: () => { UI.segSel = []; renderAll(); }, newExpense: d => movForm(null, { type: 'gasto', cardId: d.card, msi: d.msi === '1' }), editExpense: d => movForm(d.id),
   newSegment: () => segmentForm(), editSegment: d => segmentForm(d.id),
   addSegInline: () => {
     const f = $('#sheetForm'), i = f.elements.newSeg, n = (i.value || '').trim();
@@ -1613,6 +1651,7 @@ const A = {
     i.value = ''; i.focus();
   },
   purchaseDetail: d => purchaseDetail(d.id),
+  fillReceived: () => { const f = $('#sheetForm'), t = num(f.elements.total.value), later = +f.querySelector('#laterPaid').dataset.v || 0; if (!(t > 0)) return toast('Escribe primero el monto de la venta', 'error'); f.elements.received.value = fmtN(Math.max(0, t - later)); f.elements.received.dispatchEvent(new Event('input', { bubbles: true })); },
   clearLegacyDef: async d => { const c = byId(S.cards, d.id); if (!c || !await confirmDlg('Quitar saldo diferido', 'Se quitará el saldo diferido que venía de la versión anterior. Puedes registrar tus compras a meses con el botón "Compra a meses".', 'Quitar')) return; c.msi = 0; c.other = 0; persist(); drawSheet(false); renderAll(); toast('Saldo diferido quitado'); },
   newCard: () => cardForm(), editCard: d => cardForm(d.id), cardDetail: d => cardDetail(d.id),
   newAccount: () => accountForm(), editAccount: d => accountForm(d.id), accountDetail: d => accountDetail(d.id),
