@@ -40,6 +40,13 @@
   .fade-in { animation: fadeIn .2s ease; }
   .pop { animation: pop .18s ease; }
   .view-in { animation: fadeIn .18s ease; }
+  /* Tarjeta volteable "Por pagar" */
+  .flip-card { perspective: 1000px; }
+  .flip-inner { position: relative; height: 100%; transform-style: preserve-3d; -webkit-transform-style: preserve-3d; transition: transform .55s cubic-bezier(.2,.8,.2,1); }
+  .flip-inner.is-flipped { transform: rotateY(180deg); }
+  .flip-face { -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .flip-back { position: absolute; inset: 0; transform: rotateY(180deg); }
+  @media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
   /* Casillas de segmentos (selección múltiple con puntito) */
   .segc:checked + .segv { border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.12); color: #d1fae5; }
   .segc:checked + .segv .segdot { border-color: #34d399; }
@@ -95,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.3';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.4';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -661,6 +668,32 @@ function statCard(label, value, sub, ic, tone, view, act = 'nav') {
     <div class="text-[11px] text-zinc-500 mt-1 truncate">${sub}</div>
   </button>`;
 }
+/* Por pagar: total acumulado (deudas + todo lo adeudado en tarjetas) vs. lo que corresponde a este mes
+   (pago del período de cada tarjeta + deudas propias vencidas o con fecha límite dentro del mes). */
+function payables() {
+  const T = T0(), mEnd = toISO(new Date(T.getFullYear(), T.getMonth() + 1, 0));
+  const dInfos = S.debts.map(debtInfo).filter(i => i.balance > 0.005), cInfos = S.cards.map(cardInfo);
+  const debtsAll = r2(sum(dInfos, i => i.balance)), cardsAll = r2(sum(cInfos, i => Math.max(0, i.owed)));
+  const debtsMonth = r2(sum(dInfos.filter(i => i.d.dueDate && i.d.dueDate <= mEnd), i => i.balance)), cardsMonth = r2(sum(cInfos, i => i.due));
+  return { total: r2(debtsAll + cardsAll), debtsAll, cardsAll, month: r2(debtsMonth + cardsMonth), debtsMonth, cardsMonth, monthName: MES[T.getMonth()] };
+}
+function payFlipCard() {
+  const P = payables(), flipped = !!UI.payFlip;
+  const face = (back, tag, value, sub) => `<div class="flip-face ${back ? 'flip-back' : 'relative h-full'} rounded-2xl ${back ? 'bg-zinc-900 border-rose-500/30' : 'bg-zinc-900/70 border-zinc-800/80'} border p-3.5 min-w-0" ${back ? 'aria-hidden="true"' : ''}>
+      <div class="flex items-center justify-between mb-3 gap-2">
+        <span class="min-w-0 flex items-center gap-1.5"><span class="text-[12px] font-medium text-zinc-400 truncate">Por pagar</span>${icon('repeat', 'w-3 h-3 text-zinc-600 shrink-0')}</span>
+        <button data-act="nav" data-v="deudas" aria-label="Ver deudas" class="w-8 h-8 shrink-0 rounded-lg grid place-items-center bg-rose-500/10 text-rose-400 active:bg-rose-500/20">${icon('arrow-up-right', 'w-4 h-4')}</button>
+      </div>
+      <div class="${fitCls(value)} font-semibold tabular-nums tracking-tight truncate">${value}</div>
+      <div class="flex items-center gap-1.5 mt-1 min-w-0"><span class="shrink-0 px-1.5 py-px rounded text-[10px] font-semibold uppercase tracking-wide ${back ? 'bg-rose-500/15 text-rose-300' : 'bg-zinc-800 text-zinc-400'}">${tag}</span><span class="text-[11px] text-zinc-500 truncate">${sub}</span></div>
+    </div>`;
+  return `<div class="flip-card min-w-0" data-act="flipPay" role="button" tabindex="0" aria-pressed="${flipped}" aria-label="Por pagar: tocar para alternar entre total acumulado y este mes">
+    <div class="flip-inner ${flipped ? 'is-flipped' : ''}">
+      ${face(false, 'Total', fmt(P.total), `Deudas ${fmt(P.debtsAll)} · TDC ${fmt(P.cardsAll)}`)}
+      ${face(true, 'Este mes', fmt(P.month), `TDC período ${fmt(P.cardsMonth)} · Deudas ${fmt(P.debtsMonth)}`)}
+    </div>
+  </div>`;
+}
 function salesStats(r) {
   const A = S.sales.filter(s => inRange(s.date, r)), L = A.filter(s => s.kind !== 'prestamo'), loans = A.filter(s => s.kind === 'prestamo');
   return { list: L, total: sum(L, s => s.total), units: sum(L, s => s.qty), count: L.length, contado: sum(L.filter(s => s.pay === 'contado'), s => s.total),
@@ -671,8 +704,6 @@ R.dashboard = () => {
   const bal = sum(S.accounts, accBal);
   const creds = S.credits.map(creditInfo).filter(i => i.balance > 0.005);
   const porCobrar = sum(creds, i => i.balance);
-  const debts = sum(S.debts.map(debtInfo), i => i.balance);
-  const cInfos = S.cards.map(cardInfo), cardsDue = sum(cInfos, i => i.due), cardsDeferred = sum(cInfos, i => i.deferred);
   const r = range(UI.dashP, UI.dashO), spent = sum(S.expenses.filter(e => !isInc(e) && inRange(e.date, r)), e => e.amount);
   let h = '';
   // 1) Tarjetas de crédito y cuentas (prioridad)
@@ -684,10 +715,9 @@ R.dashboard = () => {
   h += `<div class="grid grid-cols-2 gap-3 mt-6">
     ${statCard('Balance total', fmt(bal), `${S.accounts.length} cuenta${S.accounts.length !== 1 ? 's' : ''}`, 'wallet', 'bg-emerald-500/10 text-emerald-400', 'tarjetas')}
     ${statCard('Por cobrar', fmt(porCobrar), `${creds.length} crédito${creds.length !== 1 ? 's' : ''} activo${creds.length !== 1 ? 's' : ''}`, 'hand-coins', 'bg-sky-500/10 text-sky-400', 'clientes')}
-    ${statCard('Por pagar', fmt(debts + cardsDue), `Deudas ${fmt(debts)} · TDC período ${fmt(cardsDue)}`, 'arrow-up-right', 'bg-rose-500/10 text-rose-400', 'deudas')}
+    ${payFlipCard()}
     ${statCard('Gastos', fmt(spent), r.label, 'receipt', 'bg-rose-500/10 text-rose-400', 'gastos', 'goExp')}
   </div>`;
-  if (cardsDeferred > 0.005) h += `<div class="mt-2 px-1 text-[11px] text-zinc-500">TDC diferido (MSI y otros, fuera del pago del período): <span class="tabular-nums text-zinc-400">${fmt(cardsDeferred)}</span></div>`;
   const alerts = computeAlerts();
   if (alerts.length) {
     const BG = { bad: 'border-rose-500/25 bg-rose-500/[.07]', warn: 'border-amber-500/20 bg-amber-500/[.06]', info: 'border-sky-500/20 bg-sky-500/[.06]' };
@@ -1398,6 +1428,12 @@ const A = {
   quick: d => { sheets.pop(); ({ sale: () => saleForm(), pay: () => payForm(), mov: () => movForm(), debt: () => debtForm() })[d.v](); },
   goInv: () => { UI.view = 'ventas'; UI.salesTab = 'inventario'; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
   goSales: () => { UI.view = 'ventas'; UI.salesTab = 'historial'; UI.salesP = UI.dashP; UI.salesO = UI.dashO; renderAll(); window.scrollTo(0, 0); },
+  flipPay: (d, el) => {
+    UI.payFlip = !UI.payFlip; saveUI();
+    el.querySelector('.flip-inner').classList.toggle('is-flipped', UI.payFlip);
+    el.setAttribute('aria-pressed', String(UI.payFlip));
+    const [f, b] = el.querySelectorAll('.flip-face'); f.setAttribute('aria-hidden', String(UI.payFlip)); b.setAttribute('aria-hidden', String(!UI.payFlip));
+  },
   goExp: () => { UI.view = 'gastos'; UI.expP = UI.dashP; UI.expO = UI.dashO; UI.segF = ''; renderAll(); window.scrollTo(0, 0); },
   setUI: d => { UI[d.k] = d.v; renderAll(); },
   setPeriod: d => { UI[d.k + 'P'] = d.v; UI[d.k + 'O'] = 0; renderAll(); },
@@ -1444,6 +1480,7 @@ document.addEventListener('click', e => {
   if (el.disabled) return;
   e.preventDefault(); fn(el.dataset, el, e);
 });
+document.addEventListener('keydown', e => { if ((e.key === 'Enter' || e.key === ' ') && e.target.dataset?.act === 'flipPay') { e.preventDefault(); A.flipPay(e.target.dataset, e.target); } });
 document.addEventListener('input', e => {
   const t = e.target; if (!t.dataset || !t.dataset.filter) return;
   const q = t.value.trim().toLowerCase(), box = document.getElementById(t.dataset.filter); if (!box) return;
