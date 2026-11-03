@@ -59,7 +59,7 @@
 <!-- Encabezado -->
 <header class="fixed top-0 inset-x-0 z-30 bg-zinc-950/85 backdrop-blur-xl border-b border-zinc-900" style="padding-top:env(safe-area-inset-top)">
   <div class="h-14 max-w-3xl mx-auto flex items-center gap-2" style="padding-left:max(12px, env(safe-area-inset-left)); padding-right:max(12px, env(safe-area-inset-right))">
-    <button data-act="menu" aria-label="Menú" class="w-10 h-10 -ml-1 grid place-items-center rounded-xl text-zinc-300 active:bg-zinc-800">
+    <button id="hdrLeft" data-act="menu" aria-label="Menú" class="w-10 h-10 -ml-1 grid place-items-center rounded-xl text-zinc-300 active:bg-zinc-800">
       <i data-lucide="menu" class="w-[22px] h-[22px]"></i>
     </button>
     <h1 id="viewTitle" class="flex-1 min-w-0 text-[17px] font-semibold tracking-tight truncate"></h1>
@@ -80,12 +80,13 @@
 
 <!-- Menú lateral -->
 <div id="drawer" class="fixed inset-0 z-40 pointer-events-none">
-  <div id="drawerBg" data-act="closeMenu" class="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-200"></div>
+  <div id="drawerBg" class="absolute inset-0 bg-black/60 opacity-0 transition-opacity duration-200"></div>
   <nav id="drawerPanel" class="absolute left-0 top-0 bottom-0 w-[82%] max-w-[320px] bg-[#0c0c0f] border-r border-zinc-800/80 -translate-x-full transition-transform duration-300 ease-out flex flex-col"
     style="padding-top:calc(env(safe-area-inset-top) + 14px); padding-bottom:calc(env(safe-area-inset-bottom) + 14px); padding-left:env(safe-area-inset-left)">
     <div class="px-5 pb-5 flex items-center gap-3">
       <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 grid place-items-center text-zinc-950"><i data-lucide="chart-no-axes-combined" class="w-5 h-5"></i></div>
-      <div><div class="font-semibold leading-tight">Gestor</div><div class="text-xs text-zinc-500">Finanzas e inventario · <span id="verTag"></span></div></div>
+      <div class="flex-1 min-w-0"><div class="font-semibold leading-tight">Gestor</div><div class="text-xs text-zinc-500">Finanzas e inventario · <span id="verTag"></span></div></div>
+      <button data-act="closeMenu" aria-label="Cerrar menú" class="w-9 h-9 shrink-0 grid place-items-center rounded-full bg-zinc-800 text-zinc-300 active:bg-zinc-700"><i data-lucide="x" class="w-5 h-5"></i></button>
     </div>
     <div id="drawerItems" class="flex-1 overflow-y-auto px-3 space-y-0.5"></div>
   </nav>
@@ -102,7 +103,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.9';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.10';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -639,7 +640,7 @@ function toast(msg, type = 'ok') {
 function confirmDlg(title, msg, okLabel = 'Eliminar', danger = true) {
   return new Promise(res => {
     const d = $('#confirm');
-    d.innerHTML = `<div class="absolute inset-0 bg-black/70 fade-in" data-c="0"></div>
+    d.innerHTML = `<div class="absolute inset-0 bg-black/70 fade-in"></div>
       <div class="relative mx-6 w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-800 p-5 pop">
         <h4 class="font-semibold text-[17px]">${esc(title)}</h4><p class="text-sm text-zinc-400 mt-2 leading-relaxed">${esc(msg)}</p>
         <div class="grid grid-cols-2 gap-3 mt-5"><button data-c="0" class="h-11 rounded-xl bg-zinc-800 font-medium">Cancelar</button><button data-c="1" class="h-11 rounded-xl font-semibold ${danger ? 'bg-rose-500 text-white' : 'bg-emerald-500 text-zinc-950'}">${esc(okLabel)}</button></div>
@@ -677,11 +678,10 @@ function drawSheet(anim) {
   sheetRoot.classList.remove('hidden');
   document.documentElement.classList.add('overflow-hidden');
   const hasFooter = cfg.onSubmit || cfg.onDelete;
-  sheetRoot.innerHTML = `<div class="absolute inset-0 bg-black/65 ${anim ? 'fade-in' : ''}" data-act="sheetClose"></div>
+  sheetRoot.innerHTML = `<div class="absolute inset-0 bg-black/65 ${anim ? 'fade-in' : ''}"></div>
   <div class="absolute inset-x-0 bottom-0 mx-auto max-w-2xl ${anim ? 'slide-up' : ''}">
     <div class="flex flex-col bg-zinc-900 border border-zinc-800 border-b-0 rounded-t-[28px] shadow-2xl shadow-black" style="max-height:calc(100dvh - env(safe-area-inset-top) - 12px)">
-      <div class="pt-2.5 pb-1 grid place-items-center"><div class="w-10 h-1.5 rounded-full bg-zinc-700"></div></div>
-      <div class="flex items-center gap-2 px-4 pb-3 pt-1">
+      <div class="flex items-center gap-2 px-4 pb-3 pt-4">
         ${sheets.length > 1 ? `<button type="button" data-act="sheetBack" aria-label="Atrás" class="w-9 h-9 grid place-items-center rounded-full bg-zinc-800 text-zinc-300">${icon('chevron-left')}</button>` : ''}
         <h3 class="flex-1 text-[17px] font-semibold truncate px-1">${esc(cfg.title)}</h3>
         <button type="button" data-act="sheetCloseAll" aria-label="Cerrar" class="w-9 h-9 grid place-items-center rounded-full bg-zinc-800 text-zinc-300">${icon('x')}</button>
@@ -1091,6 +1091,8 @@ R.ajustes = () => {
 function renderAll() {
   const v = ALL_VIEWS.find(x => x[0] === UI.view) || VIEWS[0]; UI.view = v[0];
   $('#viewTitle').textContent = v[1];
+  const hl = $('#hdrLeft'), back = UI.view === 'ajustes';
+  if (hl.dataset.act !== (back ? 'navBack' : 'menu')) { hl.dataset.act = back ? 'navBack' : 'menu'; hl.setAttribute('aria-label', back ? 'Atrás' : 'Menú'); hl.innerHTML = back ? icon('chevron-left', 'w-6 h-6') : icon('menu', 'w-[22px] h-[22px]'); }
   const d = new Date(); $('#hdrRight').textContent = `${d.getDate()} ${MESC[d.getMonth()]}`;
   $('#app').innerHTML = `<div class="view-in">${R[UI.view]()}</div>`;
   renderDrawer(); icons(); saveUI();
@@ -1652,7 +1654,8 @@ function clientDetail(id) {
    ========================================================= */
 const A = {
   menu: () => openDrawer(), closeMenu: () => closeDrawer(),
-  nav: d => { UI.view = d.v; UI.movLimit = 60; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
+  navBack: () => { UI.view = UI.prevView && UI.prevView !== 'ajustes' ? UI.prevView : 'dashboard'; closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
+  nav: d => { if (d.v === 'ajustes' && UI.view !== 'ajustes') UI.prevView = UI.view; UI.view = d.v; UI.movLimit = 60; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
   fab: () => { closeDrawer(); openQuick(); },
   quick: d => { sheets.pop(); ({ sale: () => saleForm(), pay: () => payForm(), mov: () => movForm(), debt: () => debtForm() })[d.v](); },
   goInv: () => { UI.view = 'ventas'; UI.salesTab = 'inventario'; closeDrawer(); closeAllSheets(); renderAll(); window.scrollTo(0, 0); },
@@ -1668,7 +1671,7 @@ const A = {
   setPeriod: d => { UI[d.k + 'P'] = d.v; UI[d.k + 'O'] = 0; renderAll(); },
   periodNav: d => { UI[d.k + 'O'] = Math.min(0, (UI[d.k + 'O'] || 0) + (+d.v)); renderAll(); },
   moreMov: () => { UI.movLimit += 100; renderAll(); },
-  sheetClose: () => closeSheet(), sheetBack: () => closeSheet(), sheetCloseAll: () => closeAllSheets(),
+  sheetBack: () => closeSheet(), sheetCloseAll: () => closeAllSheets(),
   sheetDelete: async () => { const cfg = topSheet(); if (!cfg?.onDelete) return; const r = await cfg.onDelete(); if (r === false) return; persist(); closeSheet(); renderAll(); toast('Eliminado'); },
   step: d => { const f = $('#sheetForm'), i = f.elements[d.n], min = +(d.min ?? 1); const cur = parseInt(i.value); i.value = isNaN(cur) ? Math.max(min, d.v > 0 ? 1 : min) : Math.max(min, cur + (+d.v)); i.dispatchEvent(new Event('input', { bubbles: true })); },
   payFull: d => { const f = $('#sheetForm'); f.elements.amount.value = fmtN(+d.v); },
