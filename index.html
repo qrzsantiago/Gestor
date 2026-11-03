@@ -102,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.5';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.6';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -303,26 +303,54 @@ function debtInfo(d) {
   const dd = d.dueDate ? daysBetween(T0(), pd(d.dueDate)) : null;
   return { d, pays, paid, balance: Math.max(0, balance), status, dDue: dd, overdue: balance > 0.005 && dd !== null && dd < 0 };
 }
-/* Tarjetas: el pago del período es independiente de MSI y saldos diferidos.
-   Compras con fecha ≤ último corte pasan al pago del período; las posteriores quedan para el siguiente corte. */
+/* Tarjetas de crédito.
+   Cada gasto con tarjeta se asigna al primer corte en o después de su fecha:
+   - corte ≤ corte del mes en curso  → se suma al pago del período actual
+   - corte posterior                 → pasa al siguiente período
+   Las compras a meses se dividen en cuotas mensuales; la 1.ª va al corte de la compra y cada una al corte del mes siguiente. */
+const cutOnOrAfter = (d, day) => { let x = dayIn(d.getFullYear(), d.getMonth(), day); if (x < d) x = dayIn(d.getFullYear(), d.getMonth() + 1, day); return x; };
+const cardMonths = e => (parseInt(e.months) >= 2 ? parseInt(e.months) : 1);
+function cardCharges(c, cutDay) {
+  const out = [];
+  S.expenses.filter(e => e.cardId === c.id && !isInc(e)).forEach(e => {
+    const first = cutOnOrAfter(pd(e.date) || T0(), cutDay), n = cardMonths(e), amt = +e.amount || 0, q = r2(amt / n);
+    for (let k = 0; k < n; k++) out.push({ cut: toISO(dayIn(first.getFullYear(), first.getMonth() + k, cutDay)), amount: k === n - 1 ? r2(amt - q * (n - 1)) : q, e, k: k + 1, n });
+  });
+  if (+c.nextBase) out.push({ cut: toISO(cutOnOrAfter(pd(c.nextDate) || T0(), cutDay)), amount: +c.nextBase, legacy: true, k: 1, n: 1 });
+  return out;
+}
 function cardInfo(c) {
   const T = T0(), cutDay = validDay(c.cutDay) || 1, dueDay = validDay(c.dueDay) || 1;
-  const lastCut = toISO(lastOnOrBefore(cutDay, T));
-  const exps = S.expenses.filter(e => e.cardId === c.id && !isInc(e));
-  const charges = [...exps.map(e => ({ date: e.date, amount: +e.amount || 0 })), ...((+c.nextBase || 0) ? [{ date: c.nextDate || '0000-00-00', amount: +c.nextBase }] : [])];
-  const closed = sum(charges.filter(x => x.date <= lastCut), x => x.amount), open = sum(charges.filter(x => x.date > lastCut), x => x.amount);
-  const pay = sum(paysFor('card', c.id), p => p.amount);
-  let due = r2((+c.periodBase || 0) + closed - pay), fresh = r2(open);
-  if (due < 0) { fresh = r2(fresh + due); due = 0; }
-  const msi = r2(+c.msi || 0), other = r2(+c.other || 0), limit = r2(+c.limit || 0);
-  const deferred = r2(msi + other), owed = r2(due + fresh + deferred), available = r2(limit - owed);
+  const curCut = dayIn(T.getFullYear(), T.getMonth(), cutDay), cc = toISO(curCut);
+  const nextCutD = dayIn(curCut.getFullYear(), curCut.getMonth() + 1, cutDay), nextCut = toISO(nextCutD);
+  const ch = cardCharges(c, cutDay), pay = sum(paysFor('card', c.id), p => p.amount);
+  let due = r2((+c.periodBase || 0) + sum(ch.filter(x => x.cut <= cc), x => x.amount) - pay), carry = 0;
+  if (due < 0) { carry = -due; due = 0; }
+  const map = {};
+  ch.filter(x => x.cut > cc).forEach(x => { const g = map[x.cut] || (map[x.cut] = { cut: x.cut, amount: 0, items: [] }); g.amount = r2(g.amount + x.amount); g.items.push(x); });
+  const schedule = Object.values(map).sort((a, b) => a.cut.localeCompare(b.cut));
+  schedule.forEach(g => { const use = Math.min(carry, g.amount); g.amount = r2(g.amount - use); carry = r2(carry - use); g.credit = use; });
+  const fresh = r2(sum(schedule.filter(g => g.cut === nextCut), g => g.amount));
+  const purchases = S.expenses.filter(e => e.cardId === c.id && !isInc(e) && cardMonths(e) >= 2).map(e => {
+    const its = ch.filter(x => x.e === e), rest = its.filter(x => x.cut > cc);
+    return { e, n: its.length, q: its[0].amount, billed: its.length - rest.length, remaining: r2(sum(rest, x => x.amount)), next: rest[0] || null, lastCut: its[its.length - 1].cut };
+  }).sort((a, b) => b.remaining - a.remaining || (b.e.date || '').localeCompare(a.e.date || ''));
+  const instPending = r2(sum(purchases, x => x.remaining)), legacyDef = r2((+c.msi || 0) + (+c.other || 0));
+  const futureTotal = r2(sum(schedule, g => g.amount)), limit = r2(+c.limit || 0);
+  const owed = r2(due + futureTotal + legacyDef), available = r2(limit - owed);
   const pct = limit > 0 ? Math.max(0, Math.min(100, owed / limit * 100)) : 0;
-  const cut = nextOnOrAfter(cutDay, T), dueD = nextOnOrAfter(dueDay, T);
-  const dCut = daysBetween(T, cut), dDue = daysBetween(T, dueD);
+  let dueD = dayIn(curCut.getFullYear(), curCut.getMonth(), dueDay); if (dueD <= curCut) dueD = dayIn(curCut.getFullYear(), curCut.getMonth() + 1, dueDay);
+  const cut = nextOnOrAfter(cutDay, T), dCut = daysBetween(T, cut), dDue = daysBetween(T, dueD);
   const cutTone = dCut <= 3 ? 'warn' : 'ok';
   const dueTone = due <= 0.005 ? 'ok' : dDue <= 3 ? 'bad' : dDue <= 7 ? 'warn' : 'ok';
-  const expClosed = sum(exps.filter(e => e.date <= lastCut), e => e.amount), expOpen = sum(exps.filter(e => e.date > lastCut), e => e.amount);
-  return { c, due, fresh, msi, other, deferred, limit, owed, available, pct, lastCut, cut: toISO(cut), dueDate: toISO(dueD), dCut, dDue, cutTone, dueTone, pay, expClosed, expOpen };
+  const curInst = ch.filter(x => x.cut === cc && x.n > 1);
+  return { c, cutDay, due, fresh, nextCut, favor: r2(carry), curInst, deferred: r2(instPending + legacyDef), instPending, legacyDef, limit, owed, available, pct, curCut: cc, schedule, purchases, futureTotal,
+    cut: toISO(cut), dueDate: toISO(dueD), dCut, dDue, cutTone, dueTone, pay };
+}
+/* Período al que va un gasto con tarjeta (para mostrarlo al registrarlo) */
+function cardPeriodOf(card, dateISO) {
+  const cd = validDay(card.cutDay) || 1, T = T0(), cc = dayIn(T.getFullYear(), T.getMonth(), cd), first = cutOnOrAfter(pd(dateISO) || T, cd);
+  return { first, current: first <= cc };
 }
 function accFlows(a) {
   const id = a.id; let f = 0;
@@ -371,7 +399,7 @@ function ledger() {
   S.expenses.forEach(e => {
     const inc = isInc(e), card = inc ? null : byId(S.cards, e.cardId), segs = segNames(e.segmentIds).join(', ');
     L.push({ t: 'expense', id: e.id, date: e.date, cr: e.createdAt || 0, title: e.concept || segs || (inc ? 'Ingreso' : 'Gasto'),
-      sub: [inc ? 'Ingreso' : 'Gasto', e.concept ? segs : '', card ? card.name : accName(e.accountId)].filter(Boolean).join(' · '),
+      sub: [inc ? 'Ingreso' : 'Gasto', e.concept ? segs : '', card ? card.name : accName(e.accountId), card && cardMonths(e) >= 2 ? `${cardMonths(e)} meses` : ''].filter(Boolean).join(' · '),
       amount: e.amount, sign: inc ? 1 : -1, acc: card ? null : e.accountId, card: card ? e.cardId : null, segs: e.segmentIds || [],
       icon: inc ? 'arrow-down-left' : 'receipt', tone: inc ? 'bg-emerald-500/10 text-emerald-400' : 'bg-rose-500/10 text-rose-400', type: inc ? 'ingresos' : 'gastos' });
   });
@@ -441,7 +469,7 @@ function groupedLedger(list, id = '') {
 }
 const CARD_COLORS = { violet: 'from-violet-600 to-purple-900', slate: 'from-slate-600 to-slate-900', sky: 'from-sky-600 to-indigo-900', emerald: 'from-emerald-600 to-teal-900', rose: 'from-rose-600 to-red-900', orange: 'from-orange-500 to-red-800', amber: 'from-amber-500 to-orange-800', zinc: 'from-zinc-600 to-zinc-900' };
 function dateChip(l, date, d, tone) {
-  return `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 text-[11px] text-white/90 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full ${DOT[tone]}"></span>${l} ${fmtDs(date)} · ${d === 0 ? 'hoy' : d + 'd'}</span>`;
+  return `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 text-[11px] text-white/90 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full ${DOT[tone]}"></span>${l} ${fmtDs(date)} · ${d < 0 ? 'vencido' : d === 0 ? 'hoy' : d + 'd'}</span>`;
 }
 function cardVisual(c, wide = false) {
   const i = cardInfo(c);
@@ -454,7 +482,7 @@ function cardVisual(c, wide = false) {
     <div class="relative h-1.5 rounded-full bg-black/25 mt-3 overflow-hidden"><div class="h-full bg-white/85 rounded-full" style="width:${i.pct}%"></div></div>
     <div class="relative grid grid-cols-3 gap-2 mt-2 text-[10px] text-white/60 tabular-nums">
       <div class="min-w-0"><div>Disponible</div><div class="text-white/90 text-[11px] truncate">${fmt(i.available)}</div></div>
-      <div class="min-w-0"><div>MSI / diferido</div><div class="text-white/90 text-[11px] truncate">${fmt(i.deferred)}</div></div>
+      <div class="min-w-0"><div>A meses</div><div class="text-white/90 text-[11px] truncate">${fmt(i.deferred)}</div></div>
       <div class="min-w-0 text-right"><div>Sig. corte</div><div class="text-white/90 text-[11px] truncate">${fmt(i.fresh)}</div></div>
     </div>
     <div class="relative flex flex-wrap gap-1.5 mt-3">${dateChip('Corte', i.cut, i.dCut, i.cutTone)}${dateChip('Pago', i.dueDate, i.dDue, i.dueTone)}</div>
@@ -775,7 +803,7 @@ R.dashboard = () => {
 
 R.tarjetas = () => {
   const infos = S.cards.map(cardInfo);
-  let h = `<div class="grid grid-cols-3 gap-2">${kv('Pagar este período', fmt(sum(infos, i => i.due)), 'text-[13px] text-rose-400')}${kv('MSI / diferido', fmt(sum(infos, i => i.deferred)), 'text-[13px]')}${kv('Disponible', fmt(sum(infos, i => i.available)), 'text-[13px] text-emerald-400')}</div>`;
+  let h = `<div class="grid grid-cols-3 gap-2">${kv('Pagar este período', fmt(sum(infos, i => i.due)), 'text-[13px] text-rose-400')}${kv('A meses pendiente', fmt(sum(infos, i => i.deferred)), 'text-[13px]')}${kv('Disponible', fmt(sum(infos, i => i.available)), 'text-[13px] text-emerald-400')}</div>`;
   h += secTitle('Tarjetas de crédito', btn('Tarjeta', 'newCard', 'plus', '', 'ghost'));
   h += S.cards.length ? `<div class="space-y-3">${S.cards.map(c => `<div data-act="cardDetail" data-id="${c.id}" class="active:scale-[.99] transition">${cardVisual(c, true)}</div>`).join('')}</div>` : empty('credit-card', 'Sin tarjetas registradas.');
   h += secTitle('Cuentas', btn('Cuenta', 'newAccount', 'plus', '', 'ghost'));
@@ -950,11 +978,11 @@ R.gastos = () => {
 
 R.deudas = () => {
   const infos = S.debts.map(debtInfo), cards = S.cards.map(cardInfo);
-  const dOwed = sum(infos, i => i.balance), cDue = sum(cards, i => i.due), cDef = sum(cards, i => i.deferred + i.fresh);
+  const dOwed = sum(infos, i => i.balance), cDue = sum(cards, i => i.due), cDef = sum(cards, i => i.owed - i.due);
   let h = `<div class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
     <div class="text-[12px] text-zinc-400">Total por pagar</div><div class="text-[30px] font-semibold tabular-nums tracking-tight text-rose-400">${fmt(dOwed + cDue)}</div>
     <div class="grid grid-cols-2 gap-3 mt-3">${kv('Deudas propias', fmt(dOwed))}<button data-act="nav" data-v="tarjetas" class="text-left min-w-0">${kv('TDC este período', fmt(cDue))}</button></div>
-    ${cDef > 0.005 ? `<div class="text-xs text-zinc-500 mt-3">No incluido: TDC diferido y compras del siguiente corte <span class="tabular-nums text-zinc-400">${fmt(cDef)}</span></div>` : ''}</div>`;
+    ${cDef > 0.005 ? `<div class="text-xs text-zinc-500 mt-3">No incluido: TDC de siguientes cortes y compras a meses <span class="tabular-nums text-zinc-400">${fmt(cDef)}</span></div>` : ''}</div>`;
   h += `<div class="flex items-center justify-between mt-6 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Mis deudas</h2><div class="flex gap-2">${btn('Pagar', 'newPay', 'hand-coins', 'data-kind="debt"', 'ghost')}${btn('Nueva', 'newDebt')}</div></div>`;
   const act = infos.filter(i => i.balance > 0.005).sort((a, b) => (a.dDue ?? 9e9) - (b.dDue ?? 9e9)), paid = infos.filter(i => i.balance <= 0.005);
   h += act.length ? listBox(act.map(debtRow).join('')) : empty('landmark', 'Sin deudas pendientes.');
@@ -1184,13 +1212,27 @@ function movForm(id, preset = {}) {
       ${fld('Segmentos <span class="text-zinc-600 font-normal">· puedes marcar varios</span>', `<div id="segBox" class="flex flex-wrap gap-2">${[...S.segments].sort(byName).map(sg => segChip(sg.id, sg.name, selSegs.includes(sg.id))).join('')}</div>
         <div class="flex gap-2 ${S.segments.length ? 'mt-2.5' : ''}"><input name="newSeg" aria-label="Nuevo segmento" autocomplete="off" autocorrect="off" spellcheck="false" class="${inCls} h-10 flex-1 min-w-0"><button type="button" data-act="addSegInline" class="h-10 px-3.5 rounded-xl bg-zinc-800 text-sm font-semibold inline-flex items-center gap-1.5 shrink-0">${icon('plus', 'w-4 h-4')}Segmento</button></div>`)}
       ${fld('Concepto (opcional)', inp('concept', x?.concept || ''))}
-      <div data-show="type=gasto">${fld('Pagado con', sel('methodG', methodOptsG(), mG))}</div>
+      <div data-show="type=gasto">${fld('Pagado con', sel('methodG', methodOptsG(), mG))}
+        <div id="cardBox" class="hidden -mt-1 mb-4 rounded-2xl border border-zinc-800 bg-zinc-950/40 p-4">
+          <div id="cardPeriod" class="text-[13px] text-zinc-400 mb-3"></div>
+          <label class="flex items-center justify-between gap-3"><span><span class="block text-sm font-medium">Compra a meses</span><span class="block text-xs text-zinc-500">Se divide en pagos mensuales</span></span>
+            <span class="relative shrink-0"><input type="checkbox" name="msi" ${(x && cardMonths(x) >= 2) || preset.msi ? 'checked' : ''} class="peer sr-only"><span class="block w-11 h-6 rounded-full bg-zinc-700 peer-checked:bg-emerald-500 transition"></span><span class="absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition peer-checked:translate-x-5"></span></span></label>
+          <div id="msiMonths" class="hidden mt-3">${fld('Número de meses', stepper('months', x && cardMonths(x) >= 2 ? x.months : '', 2))}<div id="msiPrev" class="text-[13px] text-zinc-300 -mt-1"></div></div>
+        </div></div>
       <div data-show="type=ingreso">${fld('Entra a la cuenta', sel('methodI', methodOptsI(), mI))}</div>
       ${fld('Fecha', dateInp('date', x?.date || ''))}`,
     onInput(f) {
       const t = getVal(f, 'type'), sg = f.querySelector('#amtSign');
       sg.textContent = t === 'ingreso' ? '+$' : t === 'gasto' ? '−$' : '$';
       sg.className = `absolute left-3.5 top-1/2 -translate-y-1/2 font-semibold pointer-events-none ${t === 'ingreso' ? 'text-emerald-400' : t === 'gasto' ? 'text-rose-400' : 'text-zinc-500'}`;
+      const E = f.elements, m = E.methodG.value || '', card = t === 'gasto' && m.startsWith('card:') ? byId(S.cards, m.slice(5)) : null;
+      f.querySelector('#cardBox').classList.toggle('hidden', !card);
+      if (!card) return;
+      const on = E.msi.checked, n = parseInt(E.months.value) || 0, amt = num(E.amount.value), per = cardPeriodOf(card, E.date.value || today());
+      f.querySelector('#msiMonths').classList.toggle('hidden', !on);
+      f.querySelector('#cardPeriod').innerHTML = on ? `La primera mensualidad va al corte del <b class="text-zinc-200">${fmtD(toISO(per.first))}</b>.`
+        : per.current ? `Se suma al <b class="text-zinc-200">pago del período actual</b> (corte ${fmtD(toISO(per.first))}).` : `Pasa al <b class="text-zinc-200">siguiente período</b> (corte ${fmtD(toISO(per.first))}).`;
+      f.querySelector('#msiPrev').innerHTML = on && n >= 2 && amt > 0 ? `${n} pagos mensuales de <b class="text-white tabular-nums">${fmt(amt / n)}</b>` : '';
     },
     onSubmit(f, form) {
       if (f.type !== 'ingreso' && f.type !== 'gasto') return err('Elige si es Ingreso o Gasto');
@@ -1209,9 +1251,13 @@ function movForm(id, preset = {}) {
         if (!segmentIds.includes(sid)) segmentIds.push(sid);
       }
       const [mt, mid] = ((f.type === 'gasto' ? f.methodG : f.methodI) || '').split(':');
+      const msi = f.type === 'gasto' && mt === 'card' && f.msi;
+      const months = msi ? parseInt(f.months) : 0;
+      if (msi && !(months >= 2 && months <= 60)) return err('Escribe el número de meses (de 2 a 60)');
       const rec = x || { id: uid(), createdAt: Date.now() };
       Object.assign(rec, { type: f.type, amount, segmentIds, concept: (f.concept || '').trim(), date: f.date || today(),
         accountId: mt === 'acc' ? mid : null, cardId: f.type === 'gasto' && mt === 'card' ? mid : null });
+      if (months) rec.months = months; else delete rec.months;
       if (!x) S.expenses.push(rec);
       const lbl = f.type === 'ingreso' ? 'Ingreso' : 'Gasto';
       return x ? `${lbl} actualizado` : `${lbl} registrado · ${f.type === 'ingreso' ? '+' : '−'}${fmt(amount)}`;
@@ -1258,41 +1304,35 @@ function clientForm(id) {
   });
 }
 
+function autoColor() { const keys = Object.keys(CARD_COLORS), used = S.cards.map(x => x.color); return keys.find(k => !used.includes(k)) || keys[S.cards.length % keys.length]; }
 function cardForm(id) {
   const c = id ? byId(S.cards, id) : null; const i = c ? cardInfo(c) : null;
   openSheet({
     title: c ? 'Editar tarjeta' : 'Nueva tarjeta de crédito', exists: () => !id || !!byId(S.cards, id), focus: c ? null : 'name',
     body: () => `
       ${fld('Nombre de la tarjeta', inp('name', c?.name || ''))}
-      ${fld('Color', `<div class="flex flex-wrap gap-2.5">${Object.entries(CARD_COLORS).map(([k, g]) => `<label><input type="radio" name="color" value="${k}" ${c && k === c.color ? 'checked' : ''} class="peer sr-only"><span class="block w-10 h-10 rounded-xl bg-gradient-to-br ${g} ring-2 ring-transparent ring-offset-2 ring-offset-zinc-900 peer-checked:ring-white"></span></label>`).join('')}</div>`)}
       ${fld('Límite total', money('limit', c ? c.limit : ''))}
-      <div class="rounded-2xl border border-rose-500/20 bg-rose-500/[.04] p-4 mb-4">
-        ${fld('Pago del período actual', money('due', i ? i.due : ''), 'Solo lo que corresponde pagar en este período. No incluye MSI ni saldos diferidos.')}
-        ${fld('Compras después del corte', money('fresh', i ? i.fresh : ''), 'Pasan automáticamente al pago del período en el siguiente corte.')}
-      </div>
-      <div class="grid grid-cols-2 gap-3">${fld('Saldo en MSI', money('msi', c ? (c.msi || '') : ''))}${fld('Otros saldos diferidos', money('other', c ? (c.other || '') : ''))}</div>
-      <div id="cPrev" class="text-xs text-zinc-400 -mt-1 mb-4"></div>
+      ${fld('Pago del período actual', money('due', i ? i.due : ''), 'Los gastos que registres con esta tarjeta se suman solos según su fecha y el día de corte.')}
       <div class="grid grid-cols-2 gap-3">${fld('Día de corte', inp('cutDay', c?.cutDay || '', 'inputmode="numeric" pattern="[0-9]*"'))}${fld('Día límite de pago', inp('dueDay', c?.dueDay || '', 'inputmode="numeric" pattern="[0-9]*"'))}</div>`,
-    onInput(f) { const E = f.elements, l = num(E.limit.value), u = num(E.due.value) + num(E.fresh.value) + num(E.msi.value) + num(E.other.value); f.querySelector('#cPrev').innerHTML = l > 0 ? `Límite disponible: <b class="${l - u >= 0 ? 'text-emerald-400' : 'text-rose-400'} tabular-nums">${fmt(l - u)}</b>` : ''; },
     onSubmit(f) {
       const name = (f.name || '').trim(); if (!name) return err('Escribe el nombre de la tarjeta');
       const cd = validDay(f.cutDay), dd = validDay(f.dueDay);
       if (!cd || !dd) return err('Los días de corte y de pago deben estar entre 1 y 31');
-      const rec = c || { id: uid(), createdAt: Date.now() };
-      Object.assign(rec, { name, color: f.color || rec.color || 'zinc', limit: r2(num(f.limit)), msi: r2(num(f.msi)), other: r2(num(f.other)), cutDay: cd, dueDay: dd });
-      // Reconstruye las bases para que los valores escritos sean los vigentes hoy
-      const T = T0(), lastCut = lastOnOrBefore(cd, T), lc = toISO(lastCut);
-      const exps = S.expenses.filter(e => e.cardId === rec.id && !isInc(e));
-      const closed = sum(exps.filter(e => e.date <= lc), e => e.amount), open = sum(exps.filter(e => e.date > lc), e => e.amount);
-      const pay = sum(paysFor('card', rec.id), p => p.amount);
-      rec.periodBase = r2(num(f.due) - (closed - pay));
-      rec.nextBase = r2(num(f.fresh) - open);
-      rec.nextDate = toISO(addDays(lastCut, 1));
+      const rec = c || { id: uid(), createdAt: Date.now(), color: autoColor() };
+      Object.assign(rec, { name, limit: r2(num(f.limit)), cutDay: cd, dueDay: dd });
+      // El monto escrito es el pago vigente hoy; los cargos ya registrados se descuentan de la base
+      // Si no cambió el pago del período ni el día de corte, la base se conserva (incluido un saldo a favor)
+      const unchanged = c && i && Math.abs(num(f.due) - i.due) < 0.005 && cd === i.cutDay;
+      if (!unchanged) {
+        const T = T0(), cc = toISO(dayIn(T.getFullYear(), T.getMonth(), cd));
+        const closed = sum(cardCharges(rec, cd).filter(x => x.cut <= cc), x => x.amount), pay = sum(paysFor('card', rec.id), p => p.amount);
+        rec.periodBase = r2(num(f.due) - (closed - pay));
+      }
       if (!c) S.cards.push(rec); return c ? 'Tarjeta actualizada' : 'Tarjeta agregada';
     },
     onDelete: c ? async () => {
       if (!await confirmDlg('Eliminar tarjeta', `¿Eliminar "${c.name}"? Sus pagos registrados se eliminarán y los gastos hechos con ella quedarán sin método de pago.`)) return false;
-      S.cards = S.cards.filter(x => x.id !== c.id); S.payments = S.payments.filter(p => !(p.kind === 'card' && p.targetId === c.id)); S.expenses.forEach(e => { if (e.cardId === c.id) e.cardId = null; });
+      S.cards = S.cards.filter(x => x.id !== c.id); S.payments = S.payments.filter(p => !(p.kind === 'card' && p.targetId === c.id)); S.expenses.forEach(e => { if (e.cardId === c.id) { e.cardId = null; delete e.months; } });
     } : null,
   });
 }
@@ -1396,6 +1436,7 @@ function debtDetail(id) {
     },
   });
 }
+const purchaseName = e => e.concept || segNames(e.segmentIds).join(', ') || 'Compra a meses';
 function cardDetail(id) {
   openSheet({
     title: 'Tarjeta de crédito', exists: () => !!byId(S.cards, id),
@@ -1403,22 +1444,38 @@ function cardDetail(id) {
       const c = byId(S.cards, id); if (!c) return ''; const i = cardInfo(c);
       const L = ledger().filter(x => x.card === id);
       const tone = i.dueTone === 'bad' ? 'text-rose-400' : i.dueTone === 'warn' ? 'text-amber-400' : 'text-zinc-500';
+      const itemTxt = g => { const parts = [], plain = g.items.filter(x => x.n === 1 && !x.legacy), leg = g.items.filter(x => x.legacy);
+        if (plain.length) parts.push(`${plain.length} compra${plain.length !== 1 ? 's' : ''} ${fmt(sum(plain, x => x.amount))}`);
+        g.items.filter(x => x.n > 1).forEach(x => parts.push(`${esc(purchaseName(x.e))} ${x.k}/${x.n}`));
+        if (leg.length) parts.push(`Saldo anterior ${fmt(sum(leg, x => x.amount))}`);
+        if (g.credit) parts.push(`Saldo a favor −${fmt(g.credit)}`);
+        return parts.join(' · '); };
       return `${cardVisual(c, true)}
-        <div class="grid grid-cols-3 gap-2 mt-4">${actBtn('Pagar', 'newPay', 'hand-coins', `data-kind="card" data-target="${c.id}"`, true)}${actBtn('Gasto', 'newExpense', 'receipt', `data-card="${c.id}"`)}${actBtn('Editar', 'editCard', 'pencil', `data-id="${c.id}"`)}</div>
+        <div class="grid grid-cols-2 gap-2 mt-4">${actBtn('Pagar', 'newPay', 'hand-coins', `data-kind="card" data-target="${c.id}"`, true)}${actBtn('Gasto', 'newExpense', 'receipt', `data-card="${c.id}"`)}${actBtn('Compra a meses', 'newExpense', 'calendar-range', `data-card="${c.id}" data-msi="1"`)}${actBtn('Editar', 'editCard', 'pencil', `data-id="${c.id}"`)}</div>
         <div class="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/[.05] p-4">
-          <div class="text-[12px] text-zinc-400">Pagar este período</div>
+          <div class="text-[12px] text-zinc-400">Pagar este período · corte ${fmtD(i.curCut)}</div>
           <div class="text-[28px] font-semibold tabular-nums tracking-tight">${fmt(i.due)}</div>
-          <div class="text-xs mt-1 ${tone}">Fecha límite ${fmtD(i.dueDate)} · ${dayWord(i.dDue)}</div>
+          <div class="text-xs mt-1 ${tone}">${i.due > 0.005 && i.dDue < 0 ? `Venció el ${fmtD(i.dueDate)}` : `Fecha límite ${fmtD(i.dueDate)} · ${dayWord(i.dDue)}`}</div>
         </div>
         <div class="mt-3 divide-y divide-zinc-800/70">
-          ${row('Compras después del corte', fmt(i.fresh))}
-          ${row('Saldo en MSI', fmt(i.msi))}
-          ${row('Otros saldos diferidos', fmt(i.other))}
+          ${row(`Siguiente período · corte ${fmtDs(i.nextCut)}`, fmt(i.fresh))}
+          ${row('Compras a meses por pagar', fmt(i.instPending))}
+          ${i.favor > 0.005 ? row('Saldo a favor', `<span class="text-emerald-400">${fmt(i.favor)}</span>`) : ''}
           ${row('Límite total', fmt(i.limit))}
           ${row('Límite disponible', `<span class="${i.available < 0 ? 'text-rose-400' : 'text-emerald-400'}">${fmt(i.available)}</span>`)}
-          ${row('Último corte', fmtD(i.lastCut))}
           ${row('Próximo corte', `${fmtD(i.cut)} <span class="${i.cutTone === 'warn' ? 'text-amber-400' : 'text-zinc-500'}">(${dayWord(i.dCut)})</span>`)}
         </div>
+        ${i.legacyDef > 0.005 ? `<div class="mt-3 flex items-center justify-between gap-3 rounded-xl border border-zinc-800 bg-zinc-950/60 px-3.5 py-2.5"><span class="text-[13px] text-zinc-400 min-w-0">Saldo diferido de la versión anterior: <b class="text-zinc-200 tabular-nums">${fmt(i.legacyDef)}</b></span><button type="button" data-act="clearLegacyDef" data-id="${c.id}" class="text-[13px] font-semibold text-rose-400 shrink-0">Quitar</button></div>` : ''}
+        ${subH('Calendario de pagos')}
+        ${listBox(`<div class="flex items-start justify-between gap-3 px-3.5 py-3 bg-rose-500/[.04]"><span class="min-w-0"><span class="block text-sm font-medium">Corte ${fmtD(i.curCut)}</span><span class="block text-xs text-zinc-500">Pago del período actual · límite ${fmtDs(i.dueDate)}${i.curInst.length ? ` · incluye ${i.curInst.map(x => `${esc(purchaseName(x.e))} ${x.k}/${x.n}`).join(', ')}` : ''}</span></span><span class="font-semibold tabular-nums text-rose-300 shrink-0">${fmt(i.due)}</span></div>` +
+          (i.schedule.length ? i.schedule.filter(g => g.amount > 0.005 || g.items.some(x => x.n > 1)).slice(0, 18).map(g => `<div class="flex items-start justify-between gap-3 px-3.5 py-3"><span class="min-w-0"><span class="block text-sm">Corte ${fmtD(g.cut)}</span><span class="block text-xs text-zinc-500">${itemTxt(g)}</span></span><span class="font-semibold tabular-nums shrink-0">${fmt(g.amount)}</span></div>`).join('') : `<div class="px-3.5 py-3 text-sm text-zinc-500">Sin cargos para los siguientes cortes.</div>`))}
+        ${subH(`Compras a meses (${i.purchases.length})`)}
+        ${i.purchases.length ? listBox(i.purchases.map(x => `<button type="button" data-act="editExpense" data-id="${x.e.id}" class="w-full text-left px-3.5 py-3 active:bg-zinc-800/60 block">
+            <div class="flex items-start justify-between gap-3"><span class="min-w-0"><span class="block text-sm font-medium truncate">${esc(purchaseName(x.e))}</span><span class="block text-xs text-zinc-500">${fmt(x.e.amount)} · ${x.n} meses de ${fmt(x.q)} · ${fmtDs(x.e.date)}</span></span>
+            <span class="text-right shrink-0"><span class="block font-semibold tabular-nums">${fmt(x.remaining)}</span><span class="block text-[11px] text-zinc-500">por pagar</span></span></div>
+            <div class="mt-2.5">${progress(x.billed / x.n * 100, 'bg-violet-400')}</div>
+            <div class="flex justify-between text-[11px] text-zinc-500 mt-1.5"><span>${x.billed} de ${x.n} cuotas cargadas</span><span>${x.next ? `Próxima: corte ${fmtDs(x.next.cut)}` : 'Liquidada en cortes'}</span></div>
+          </button>`).join('')) : '<div class="text-sm text-zinc-500 py-2">Sin compras a meses.</div>'}
         ${subH('Movimientos con esta tarjeta')}${L.length ? listBox(L.slice(0, 40).map(ledgerRow).join('')) : '<div class="text-sm text-zinc-500 py-2">Sin movimientos registrados.</div>'}<div class="h-2"></div>`;
     },
   });
@@ -1485,7 +1542,7 @@ const A = {
   editCredit: d => { const c = byId(S.credits, d.id); if (c?.saleId) saleForm(c.saleId); }, creditDetail: d => creditDetail(d.id),
   delCredit: async d => { if (await delCredit(d.id)) { persist(); closeSheet(); renderAll(); toast('Eliminado'); } },
   newPay: d => payForm(null, { kind: d.kind, targetId: d.target }), editPay: d => payForm(d.id),
-  newMov: d => movForm(null, { type: d.type, segId: d.seg }), newExpense: d => movForm(null, { type: 'gasto', cardId: d.card }), editExpense: d => movForm(d.id),
+  newMov: d => movForm(null, { type: d.type, segId: d.seg }), newExpense: d => movForm(null, { type: 'gasto', cardId: d.card, msi: d.msi === '1' }), editExpense: d => movForm(d.id),
   newSegment: () => segmentForm(), editSegment: d => segmentForm(d.id),
   addSegInline: () => {
     const f = $('#sheetForm'), i = f.elements.newSeg, n = (i.value || '').trim();
@@ -1495,6 +1552,7 @@ const A = {
     if (cb) cb.checked = true; else box.insertAdjacentHTML('beforeend', segChip(val, ex ? ex.name : n, true));
     i.value = ''; i.focus();
   },
+  clearLegacyDef: async d => { const c = byId(S.cards, d.id); if (!c || !await confirmDlg('Quitar saldo diferido', 'Se quitará el saldo diferido que venía de la versión anterior. Puedes registrar tus compras a meses con el botón "Compra a meses".', 'Quitar')) return; c.msi = 0; c.other = 0; persist(); drawSheet(false); renderAll(); toast('Saldo diferido quitado'); },
   newCard: () => cardForm(), editCard: d => cardForm(d.id), cardDetail: d => cardDetail(d.id),
   newAccount: () => accountForm(), editAccount: d => accountForm(d.id), accountDetail: d => accountDetail(d.id),
   newDebt: () => debtForm(), editDebt: d => debtForm(d.id), debtDetail: d => debtDetail(d.id),
