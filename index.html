@@ -136,7 +136,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.14';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.15';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -1425,12 +1425,12 @@ function movForm(id, preset = {}) {
   openSheet({
     title: x ? (x.cardId && cardMonths(x) >= 2 ? 'Editar compra a meses' : REP[x.repeat] ? 'Editar recurrente' : 'Editar movimiento') : (preset.msi ? 'Nueva compra a meses' : 'Nuevo movimiento'), submit: x ? 'Guardar cambios' : 'Registrar', exists: () => !id || !!byId(S.expenses, id), focus: x || !type ? null : 'amount',
     body: () => `
+      <input name="concept" value="${esc(x?.concept || '')}" placeholder="Concepto" aria-label="Concepto" autocomplete="off" autocorrect="off" spellcheck="false" class="big-in w-full bg-transparent border-0 outline-none text-[34px] leading-tight font-extrabold tracking-tight text-zinc-50 placeholder-zinc-700 mb-3">
       <div class="flex flex-wrap gap-2 mb-4">
         <label class="mchip">${icon('calendar', 'w-4 h-4 text-zinc-400')}<span id="dateLbl">hoy</span>${icon('chevron-down', 'w-4 h-4 text-zinc-400')}<input type="date" name="date" value="${esc(x?.date || '')}" aria-label="Fecha"></label>
         ${x && x.seriesId ? `<span class="mchip text-zinc-400">${icon('repeat', 'w-4 h-4')}Parte de una serie</span>`
           : `<label class="mchip">${icon('repeat', 'w-4 h-4 text-zinc-400')}<span id="repLbl">Una vez</span>${icon('chevron-down', 'w-4 h-4 text-zinc-400')}<select name="repeat" aria-label="Repetir"><option value="">Una vez</option>${Object.entries(REP).map(([k, l]) => `<option value="${k}" ${x && x.repeat === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`}
       </div>
-      <input name="concept" value="${esc(x?.concept || '')}" placeholder="Descripción" autocomplete="off" autocorrect="off" spellcheck="false" class="big-in w-full bg-transparent border-0 outline-none text-[32px] leading-tight font-extrabold tracking-tight text-zinc-50 placeholder-zinc-700 mb-3">
       <div class="flex items-center gap-3 mb-6">
         <div class="signsw"><label><input type="radio" name="type" value="gasto" ${type === 'gasto' ? 'checked' : ''} class="sr-only"><span>−</span></label><label><input type="radio" name="type" value="ingreso" ${type === 'ingreso' ? 'checked' : ''} class="sr-only"><span>+</span></label></div>
         <input name="amount" value="${x ? fmtN(x.amount) : ''}" inputmode="decimal" autocomplete="off" data-money placeholder="0" aria-label="Monto" class="big-in flex-1 min-w-0 bg-transparent border-0 outline-none text-[40px] leading-none font-extrabold tabular-nums tracking-tight placeholder-zinc-700">
