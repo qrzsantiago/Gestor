@@ -102,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.11';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.12';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -453,6 +453,28 @@ const row = (l, v) => `<div class="flex justify-between gap-4 py-2.5 text-sm"><s
 const empty = (ic, text, action = '') => `<div class="rounded-2xl border border-dashed border-zinc-800 p-8 text-center"><div class="w-12 h-12 mx-auto rounded-2xl bg-zinc-900 grid place-items-center text-zinc-500 mb-3">${icon(ic)}</div><p class="text-sm text-zinc-500">${text}</p>${action ? `<div class="mt-4">${action}</div>` : ''}</div>`;
 const fitCls = s => s.length > 15 ? 'text-[14px]' : s.length > 12 ? 'text-[16px]' : 'text-[19px]';
 const progress = (pct, cls = 'bg-emerald-500') => `<div class="h-1.5 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${cls}" style="width:${Math.max(0, Math.min(100, pct))}%"></div></div>`;
+/* Monto abreviado para los pilares: 950 → $950 · 12,200 → $12.2k · 1,500,000 → $1.5M */
+const fmtK = n => { const a = Math.abs(+n || 0); const v = a >= 1e6 ? (a / 1e6).toFixed(1).replace(/\.0$/, '') + 'M' : a >= 999.5 ? (a / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(Math.round(a)); return '$' + v; };
+/* Gráfica de pilares: columnas redondeadas de mayor a menor, altura proporcional al monto, avatar/icono arriba y monto debajo.
+   items: [{ act, id, label, amount, avatar (html), grad (clases de color) }] */
+function pillarChart(items, title, totalTxt) {
+  const L = [...items].filter(x => x.amount > 0.005).sort((a, b) => b.amount - a.amount);
+  if (!L.length) return '';
+  const max = L[0].amount;
+  return `<div class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 pt-4 pb-3">
+    <div class="flex items-baseline justify-between gap-3 px-4 mb-3"><span class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">${title}</span><span class="text-[13px] font-semibold tabular-nums text-zinc-300">${totalTxt}</span></div>
+    <div class="flex items-stretch gap-3 overflow-x-auto no-scrollbar px-4 pb-1" style="height:250px">
+      ${L.map(x => `<button data-act="${x.act}" data-id="${x.id}" aria-label="${esc(x.label)}: ${fmt(x.amount)}" class="shrink-0 w-[62px] h-full flex flex-col items-center active:opacity-75 transition">
+        <div class="flex-1 w-full flex items-end">
+          <div class="relative w-full rounded-[22px] bg-gradient-to-b ${x.grad} shadow-lg shadow-black/30" style="height:calc(58px + (100% - 58px) * ${(x.amount / max).toFixed(4)})">
+            <span class="absolute top-1.5 left-1/2 -translate-x-1/2 w-11 h-11 rounded-full bg-zinc-950/85 ring-2 ring-white/10 grid place-items-center text-white text-[13px] font-semibold">${x.avatar}</span>
+          </div>
+        </div>
+        <div class="mt-2 text-[13px] font-semibold tabular-nums text-zinc-100 leading-none">${fmtK(x.amount)}</div>
+        <div class="mt-1 text-[11px] text-zinc-500 w-full text-center leading-tight line-clamp-2 break-words min-h-[26px]">${esc(x.label)}</div>
+      </button>`).join('')}
+    </div></div>`;
+}
 const searchBox = (id, ph) => `<div class="relative flex-1 min-w-0"><span class="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500">${icon('search', 'w-4 h-4')}</span><input data-filter="${id}" placeholder="${ph}" class="w-full h-10 pl-9 pr-3 rounded-xl bg-zinc-900 border border-zinc-800 text-zinc-100 placeholder-zinc-600 focus:outline-none focus:border-zinc-600"></div>`;
 
 function chips(items, cur, act, k) {
@@ -517,7 +539,7 @@ function accRow(a) {
     <span class="font-semibold tabular-nums ${b < 0 ? 'text-rose-400' : ''}">${fmt(b)}</span>
   </button>`;
 }
-function creditRow(i) {
+function creditRow(i, noBar = false) {
   const c = i.c, pct = i.total > 0 ? i.paid / i.total * 100 : 0;
   const meta = [creditConcept(c) || 'Venta', c.mode === 'contado' ? 'Contado' : c.mode === 'cuotas' ? (i.nCuotas ? planTxt(i.nCuotas, i.freq, i.cuota) : 'Cuotas') : (i.rate > 0 ? `Crédito ${pct1(i.rate)}%` : 'Crédito')].filter(Boolean).map(esc).join(' · ');
   return `<button data-act="creditDetail" data-id="${c.id}" data-q="${esc((cliName(c.clientId) + ' ' + creditConcept(c)).toLowerCase())}" class="w-full text-left p-4 active:bg-zinc-800/60 block">
@@ -525,7 +547,7 @@ function creditRow(i) {
       <div class="min-w-0"><div class="font-medium truncate">${esc(cliName(c.clientId) || 'Sin cliente')}</div><div class="text-xs text-zinc-500 truncate mt-0.5">${meta}</div></div>
       <div class="text-right shrink-0"><div class="font-semibold tabular-nums">${fmt(i.balance)}</div><div class="text-[11px] text-zinc-500 tabular-nums">de ${fmt(i.total)}</div></div>
     </div>
-    <div class="mt-3">${progress(pct)}</div>
+    ${noBar ? '' : `<div class="mt-3">${progress(pct)}</div>`}
     <div class="flex items-center gap-1.5 mt-3 flex-wrap">${statusBadge(i)}${i.overdueQ ? badge('Atrasado', 'bad') : ''}${i.nCuotas ? badge(`${i.covered}/${i.nCuotas} cuotas`, 'mute') : ''}${i.interest > 0 ? badge('Intereses ' + fmt(i.interest), 'warn') : ''}${i.next ? `<span class="text-[11px] text-zinc-500 ml-auto">Corte ${fmtDs(i.next)}</span>` : i.nextDue ? `<span class="text-[11px] ${i.overdueQ ? 'text-rose-400' : 'text-zinc-500'} ml-auto">Cuota ${fmtDs(i.nextDue)}</span>` : ''}</div>
   </button>`;
 }
@@ -536,8 +558,7 @@ function debtRow(i) {
       <div class="min-w-0"><div class="font-medium truncate">${esc(d.creditor)}</div>${d.concept ? `<div class="text-xs text-zinc-500 truncate mt-0.5">${esc(d.concept)}</div>` : ''}</div>
       <div class="text-right shrink-0"><div class="font-semibold tabular-nums">${fmt(i.balance)}</div><div class="text-[11px] text-zinc-500 tabular-nums">de ${fmt(d.amount)}</div></div>
     </div>
-    <div class="mt-3">${progress(pct, 'bg-amber-500')}</div>
-    <div class="flex items-center gap-1.5 mt-3 flex-wrap">${statusBadge(i)}${i.overdue ? badge('Vencida', 'bad') : ''}${d.dueDate && i.balance > 0 ? `<span class="text-[11px] ${i.dDue !== null && i.dDue <= 7 ? 'text-amber-400' : 'text-zinc-500'} ml-auto">Límite ${fmtDs(d.dueDate)} · ${dayWord(i.dDue)}</span>` : ''}</div>
+    <div class="flex items-center gap-1.5 mt-3 flex-wrap">${statusBadge(i)}${i.overdue ? badge('Vencida', 'bad') : ''}<span class="text-[11px] text-zinc-500 tabular-nums">Pagado ${Math.round(pct)}%</span>${d.dueDate && i.balance > 0 ? `<span class="text-[11px] ${i.dDue !== null && i.dDue <= 7 ? 'text-amber-400' : 'text-zinc-500'} ml-auto">Límite ${fmtDs(d.dueDate)} · ${dayWord(i.dDue)}</span>` : ''}</div>
   </button>`;
 }
 
@@ -923,8 +944,7 @@ function clientCard(x, rank) {
       <div class="min-w-0"><div class="text-[11px] text-zinc-500">Saldo actual</div><div class="${bigCls(fmt(x.balance))} leading-tight font-semibold tabular-nums tracking-tight truncate ${x.balance > 0.005 ? 'text-sky-400' : 'text-zinc-300'}">${fmt(x.balance)}</div></div>
       <div class="min-w-0 text-right"><div class="text-[11px] text-zinc-500">Deuda total</div><div class="${bigCls(fmt(x.total))} leading-tight font-semibold tabular-nums tracking-tight truncate">${fmt(x.total)}</div></div>
     </div>
-    <div class="mt-3">${progress(pct)}</div>
-    <div class="flex justify-between text-[11px] text-zinc-500 mt-1.5 tabular-nums"><span>Abonado ${fmt(x.paid)}</span><span>${x.total > 0 ? Math.round(pct) + '% pagado' : 'Sin adeudos'}</span></div>
+    <div class="flex justify-between text-[11px] text-zinc-500 mt-3 tabular-nums"><span>Abonado ${fmt(x.paid)}</span><span>${x.total > 0 ? Math.round(pct) + '% pagado' : 'Sin adeudos'}</span></div>
     ${mv.length ? `<div class="mt-3 pt-1 border-t border-zinc-800/80"><div class="text-[11px] font-semibold uppercase tracking-[.08em] text-zinc-500 pt-2">Historial</div><div class="divide-y divide-zinc-800/60">${(open ? mv : mv.slice(0, 5)).map(moveRow).join('')}</div></div>
       ${mv.length > 5 ? `<button data-act="cliExpand" data-id="${x.c.id}" class="w-full pt-2 text-[12px] text-emerald-400 text-left">${open ? 'Ver menos' : `Ver historial completo (${mv.length})`}</button>` : ''}` : '<div class="mt-3 text-xs text-zinc-500">Sin movimientos.</div>'}
     <div class="grid ${active ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-3">${actBtn('Venta', 'newSale', 'shopping-bag', `data-client="${x.c.id}"`)}${active ? actBtn('Abonar', 'newPay', 'hand-coins', `data-kind="credit" data-target="${active.c.id}"`) : ''}</div>
@@ -935,6 +955,8 @@ R.clientes = () => {
   const all = S.clients.map(c => { const x = clientSummary(c); x.mv = clientMoves(c.id); x.last = x.mv[0]?.date || ''; return x; });
   let h = viewTabs([['deuda', 'Mayor deuda'], ['az', 'A – Z'], ['reciente', 'Recientes']], mode, 'cliView');
   h += `<div class="grid grid-cols-3 gap-2 mt-4">${kv('Por cobrar', fmt(sum(all, x => x.balance)), 'text-[13px] text-sky-400')}${kv('Clientes', fmtInt(all.length), 'text-[13px]')}${kv('Con adeudo', fmtInt(all.filter(x => x.balance > 0.005).length), 'text-[13px]')}</div>`;
+  const chart = pillarChart(all.map(x => ({ act: 'clientDetail', id: x.c.id, label: x.c.name, amount: x.balance, avatar: esc(initials(x.c.name)), grad: 'from-sky-400 to-sky-700/50' })), 'Saldo por cliente', fmt(sum(all, x => x.balance)));
+  if (chart) h += `<div class="mt-4">${chart}</div>`;
   h += `<div class="flex gap-2 mt-4">${searchBox('cliList', 'Buscar')}${btn('Nuevo', 'newClient', 'user-plus')}</div>`;
   if (!all.length) return h + `<div class="mt-4">${empty('users', 'Sin clientes registrados.')}</div>`;
   if (mode === 'az') {
@@ -1047,17 +1069,18 @@ R.deudas = () => {
     <div class="grid grid-cols-3 gap-2 mt-3">
       ${[['Deudas propias', dOwed, 'bg-amber-500'], ['TDC este período', cDue, 'bg-rose-500'], ['TDC próximos meses', cLater, 'bg-violet-400']].map(([l, v, c]) => `<div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-2.5 min-w-0"><div class="flex items-start gap-1.5 text-[10px] text-zinc-500 leading-tight min-h-[26px]"><span class="w-2 h-2 mt-0.5 rounded-full shrink-0 ${c}"></span><span>${l}</span></div><div class="font-semibold tabular-nums text-[13px] mt-0.5 truncate">${fmt(v)}</div><div class="text-[10px] text-zinc-500 tabular-nums">${total > 0 ? Math.round(v / total * 100) : 0}%</div></div>`).join('')}
     </div></div>`;
+  const AV = { debt: 'landmark', due: 'credit-card', later: 'calendar-range' }, GR = { debt: 'from-amber-400 to-amber-700/50', due: 'from-rose-400 to-rose-700/50', later: 'from-violet-400 to-violet-700/50' };
+  const chart = pillarChart(items.map(x => ({ act: x.act, id: x.id, label: x.title.replace(' · este período', ' · período').replace(' · próximos meses', ' · meses'), amount: x.amount, avatar: icon(AV[x.group], 'w-5 h-5'), grad: GR[x.group] })), 'Por compromiso', fmt(total));
+  if (chart) h += `<div class="mt-4">${chart}</div>`;
   h += `<div class="flex items-center justify-between mt-6 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Desglose</h2><div class="flex gap-2">${btn('Pagar', 'newPay', 'hand-coins', '', 'ghost')}${btn('Deuda', 'newDebt')}</div></div>`;
   if (items.length) {
-    const max = Math.max(...items.map(x => x.amount));
     h += listBox([...items].sort((a, b) => b.amount - a.amount).map(x => `<button data-act="${x.act}" data-id="${x.id}" class="w-full text-left px-3.5 py-3.5 active:bg-zinc-800/60 block">
       <div class="flex items-start gap-3">
         <span class="w-9 h-9 shrink-0 rounded-xl grid place-items-center ${x.tone}">${icon(x.icon, 'w-[18px] h-[18px]')}</span>
         <span class="flex-1 min-w-0"><span class="block font-medium leading-snug line-clamp-2 break-words">${esc(x.title)}</span><span class="block text-xs text-zinc-500 mt-0.5 leading-snug line-clamp-2">${esc(x.sub)}</span></span>
         <span class="text-right shrink-0"><span class="block font-semibold tabular-nums">${fmt(x.amount)}</span><span class="block text-[11px] text-zinc-500 tabular-nums">${total > 0 ? (x.amount / total * 100).toFixed(1) : 0}% del total</span></span>
       </div>
-      <div class="mt-2.5 pl-12">${`<div class="h-2 rounded-full bg-zinc-800 overflow-hidden"><div class="h-full rounded-full ${x.color}" style="width:${Math.max(2, x.amount / max * 100)}%"></div></div>`}</div>
-      <div class="flex items-center gap-1.5 mt-2 pl-12 flex-wrap">${x.badges}<span class="text-[11px] ${x.urgent ? 'text-amber-400' : 'text-zinc-500'} ml-auto">${esc(x.when)}</span></div>
+      <div class="flex items-center gap-1.5 mt-2.5 pl-12 flex-wrap">${x.badges}<span class="text-[11px] ${x.urgent ? 'text-amber-400' : 'text-zinc-500'} ml-auto">${esc(x.when)}</span></div>
     </button>`).join(''));
   } else h += empty('circle-check', 'No tienes nada por pagar.');
   const paid = S.debts.map(debtInfo).filter(i => i.balance <= 0.005);
@@ -1542,7 +1565,6 @@ function debtDetail(id) {
     body: () => {
       const d = byId(S.debts, id); if (!d) return ''; const i = debtInfo(d);
       return `<div class="text-center pt-1 pb-3"><div class="text-sm text-zinc-400">${esc(d.creditor)}</div><div class="text-[36px] font-semibold tabular-nums tracking-tight mt-1">${fmt(i.balance)}</div><div class="text-xs text-zinc-500">Saldo pendiente</div><div class="flex justify-center gap-1.5 mt-3">${statusBadge(i)}${i.overdue ? badge('Vencida', 'bad') : ''}</div></div>
-        <div class="mb-4">${progress(d.amount > 0 ? i.paid / d.amount * 100 : 0, 'bg-amber-500')}</div>
         <div class="grid grid-cols-2 gap-2">${kv('Monto total', fmt(d.amount))}${kv('Pagado', fmt(i.paid), 'text-emerald-400')}</div>
         <div class="grid ${i.balance > 0.005 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-4">${i.balance > 0.005 ? actBtn('Registrar pago', 'newPay', 'hand-coins', `data-kind="debt" data-target="${d.id}"`, true) : ''}${actBtn('Editar', 'editDebt', 'pencil', `data-id="${d.id}"`)}</div>
         <div class="mt-4 divide-y divide-zinc-800/70">${d.concept ? row('Concepto', esc(d.concept)) : ''}${row('Fecha', fmtD(d.date))}${d.dueDate ? row('Fecha límite', `${fmtD(d.dueDate)}${i.balance > 0.005 ? ` <span class="text-zinc-500">(${dayWord(i.dDue)})</span>` : ''}`) : ''}${d.accountId ? row('Recibido en', esc(accName(d.accountId))) : ''}</div>
@@ -1641,7 +1663,7 @@ function clientDetail(id) {
       return `<div class="flex items-center gap-3 pb-4">${avatar(c.name, 'w-14 h-14 text-lg')}<div class="min-w-0"><div class="text-lg font-semibold truncate">${esc(c.name)}</div>${c.phone ? `<a href="tel:${esc(c.phone.replace(/[^\d+]/g, ''))}" class="text-sm text-emerald-400 inline-flex items-center gap-1">${icon('phone', 'w-3.5 h-3.5')}${esc(c.phone)}</a>` : ''}</div></div>
         <div class="grid grid-cols-2 gap-2">${kv('Saldo actual', fmt(x.balance), x.balance > 0 ? 'text-sky-400' : '')}${kv('Deuda total', fmt(x.total))}</div>
         <div class="grid ${firstActive ? 'grid-cols-3' : 'grid-cols-2'} gap-2 mt-4">${actBtn('Venta', 'newSale', 'shopping-bag', `data-client="${id}"`, true)}${firstActive ? actBtn('Abonar', 'newPay', 'hand-coins', `data-kind="credit" data-target="${firstActive.c.id}"`) : ''}${actBtn('Editar', 'editClient', 'pencil', `data-id="${id}"`)}</div>
-        ${subH(`Cuotas y créditos (${creds.length})`)}${creds.length ? listBox(creds.map(creditRow).join('')) : '<div class="text-sm text-zinc-500 py-2">Sin cuotas ni créditos.</div>'}
+        ${subH(`Cuotas y créditos (${creds.length})`)}${creds.length ? listBox(creds.map(i => creditRow(i, true)).join('')) : '<div class="text-sm text-zinc-500 py-2">Sin cuotas ni créditos.</div>'}
         ${subH(`Historial de movimientos (${mv.length})`)}${mv.length ? `<div class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 px-3.5 divide-y divide-zinc-800/60">${mv.map(moveRow).join('')}</div>` : '<div class="text-sm text-zinc-500 py-2">Sin movimientos.</div>'}<div class="h-2"></div>`;
     },
   });
