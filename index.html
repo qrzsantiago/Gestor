@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Gestor">
 <meta name="application-name" content="Gestor">
-<meta name="theme-color" content="#09090b">
+<meta name="theme-color" content="#131416">
 <meta name="format-detection" content="telephone=no, date=no, address=no, email=no">
 <meta name="description" content="Administración financiera e inventario local">
 <title>Gestor · Finanzas e Inventario</title>
@@ -16,15 +16,54 @@
 <link rel="icon" id="favIcon" href="data:,">
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script>
-  tailwind.config = {
-    darkMode: 'class',
-    theme: { extend: { fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Text"','"Inter"','"Segoe UI"','Roboto','sans-serif'] } } }
-  };
+  /* Paleta sobria: grises monocromáticos; verde y rojo casi desaturados solo como acento de ingresos/gastos */
+  tailwind.config = { darkMode: 'class', theme: { extend: { colors: {"zinc": {"50": "#f4f5f6", "100": "#e7e8ea", "200": "#d3d5d8", "300": "#b9bcc0", "400": "#989ba1", "500": "#75787e", "600": "#585b61", "700": "#3e4045", "800": "#2c2e32", "900": "#212226", "950": "#161719"}, "slate": {"50": "#f4f5f6", "100": "#e7e8ea", "200": "#d3d5d8", "300": "#b9bcc0", "400": "#989ba1", "500": "#75787e", "600": "#585b61", "700": "#3e4045", "800": "#2c2e32", "900": "#212226", "950": "#161719"}, "emerald": {"50": "#f1f4f2", "100": "#e1e8e3", "200": "#d0dbd3", "300": "#c4d3c8", "400": "#a8bcae", "500": "#8fa596", "600": "#748a7b", "700": "#5b6e61", "800": "#455349", "900": "#2e3831", "950": "#1d241f"}, "teal": {"50": "#f1f4f2", "100": "#e1e8e3", "200": "#d0dbd3", "300": "#c4d3c8", "400": "#a8bcae", "500": "#8fa596", "600": "#748a7b", "700": "#5b6e61", "800": "#455349", "900": "#2e3831", "950": "#1d241f"}, "rose": {"50": "#f6f1f1", "100": "#efe3e3", "200": "#ead2d2", "300": "#dcb4b4", "400": "#c99a9a", "500": "#b37f7f", "600": "#966565", "700": "#7a5050", "800": "#5e3d3d", "900": "#4a3131", "950": "#2c1f1f"}, "red": {"50": "#f6f1f1", "100": "#efe3e3", "200": "#ead2d2", "300": "#dcb4b4", "400": "#c99a9a", "500": "#b37f7f", "600": "#966565", "700": "#7a5050", "800": "#5e3d3d", "900": "#4a3131", "950": "#2c1f1f"}, "sky": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "indigo": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "violet": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "purple": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "amber": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}, "orange": {"50": "#f3f4f5", "100": "#e5e6e8", "200": "#cfd1d4", "300": "#c9cbce", "400": "#b3b6ba", "500": "#9a9da2", "600": "#7e8186", "700": "#64676c", "800": "#4a4c51", "900": "#34363a", "950": "#232427"}}, fontFamily: { sans: ['-apple-system','BlinkMacSystemFont','"SF Pro Text"','"SF Pro Display"','"Inter"','"Segoe UI"','Roboto','sans-serif'] } } } };
 </script>
 <script src="https://unpkg.com/lucide@0.460.0/dist/umd/lucide.min.js"></script>
 <style>
   :root { color-scheme: dark; }
-  html, body { background:#09090b; max-width:100%; overflow-x:hidden; overscroll-behavior-y:none; }
+  :root {
+    --bg: #131416;
+    --raise: 8px 8px 18px rgba(0,0,0,.52), -6px -6px 16px rgba(255,255,255,.028);
+    --raise-sm: 4px 4px 10px rgba(0,0,0,.48), -3px -3px 8px rgba(255,255,255,.032);
+    --press: inset 3px 3px 8px rgba(0,0,0,.58), inset -2px -2px 6px rgba(255,255,255,.035);
+    --hl: inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  html, body { background-color: var(--bg); max-width:100%; overflow-x:hidden; overscroll-behavior-y:none; }
+  /* Fondo gris casi negro con luz suave y grano sutil */
+  body::before { content:''; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background:
+      radial-gradient(900px 520px at 12% -8%, rgba(255,255,255,.07), transparent 62%),
+      radial-gradient(700px 480px at 108% 38%, rgba(255,255,255,.045), transparent 60%),
+      radial-gradient(800px 600px at 40% 115%, rgba(255,255,255,.035), transparent 60%),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+  body { letter-spacing: -.005em; }
+  h1, h2, h3, h4 { letter-spacing: -.015em; }
+  /* Cristal esmerilado: encabezado, contenedores principales, hojas y menú */
+  :root header { background: rgba(19,20,22,.58) !important; -webkit-backdrop-filter: blur(22px) saturate(140%); backdrop-filter: blur(22px) saturate(140%); border-color: rgba(255,255,255,.05) !important; }
+  :root .bg-zinc-900\/70 { background: linear-gradient(160deg, rgba(52,54,59,.52), rgba(30,31,35,.56)) !important; -webkit-backdrop-filter: blur(18px) saturate(120%); backdrop-filter: blur(18px) saturate(120%);
+    border-color: rgba(255,255,255,.055) !important; box-shadow: var(--raise), var(--hl); }
+  :root #sheetRoot > div > div, :root #confirm > div.relative { background: rgba(31,32,36,.84) !important; -webkit-backdrop-filter: blur(28px) saturate(130%); backdrop-filter: blur(28px) saturate(130%); border-color: rgba(255,255,255,.07) !important; box-shadow: 0 -10px 40px rgba(0,0,0,.5), var(--hl) !important; }
+  :root #drawerPanel { background: rgba(24,25,28,.82) !important; -webkit-backdrop-filter: blur(26px); backdrop-filter: blur(26px); border-color: rgba(255,255,255,.06) !important; }
+  :root .flip-face.bg-zinc-900 { background: linear-gradient(160deg, #2e3034, #1e1f23) !important; box-shadow: var(--raise), var(--hl); }
+  /* Neumorfismo: superficies elevadas (botones, avatares) y hundidas (campos, pistas, datos) */
+  :root .bg-zinc-800:not(.overflow-hidden), :root .bg-zinc-700\/80 { background: linear-gradient(145deg, #34363b, #26282c) !important; box-shadow: var(--raise-sm), var(--hl); border-color: rgba(255,255,255,.05) !important; }
+  :root button.bg-zinc-800:active, :root button.bg-zinc-900:active { box-shadow: var(--press) !important; }
+  :root .bg-zinc-800.overflow-hidden { background: #1a1b1e !important; box-shadow: var(--press); }
+  :root :not(body).bg-zinc-950, :root .bg-zinc-950\/60, :root .bg-zinc-950\/40, :root input.bg-zinc-900 { background: #18191c !important; box-shadow: var(--press); border-color: rgba(255,255,255,.035) !important; }
+  :root .grid.bg-zinc-900, :root .grid.bg-zinc-950 { background: #18191c !important; box-shadow: var(--press); }
+  :root button.bg-zinc-900 { background: linear-gradient(145deg, #2a2c30, #202125) !important; box-shadow: var(--raise-sm); border-color: rgba(255,255,255,.045) !important; }
+  :root .bg-zinc-100 { background: linear-gradient(145deg, #eceef0, #c3c6ca) !important; box-shadow: var(--raise-sm), inset 0 1px 0 rgba(255,255,255,.7); }
+  :root .peer:checked ~ .peer-checked\:bg-zinc-700 { background: linear-gradient(145deg, #3d4045, #2d2f33) !important; box-shadow: var(--raise-sm), var(--hl); }
+  /* Botón principal y botón flotante: plástico gris claro */
+  :root .bg-emerald-500 { background: linear-gradient(145deg, #e8eaec, #b1b4b9) !important; color: #17181b !important; box-shadow: var(--raise-sm), inset 0 1px 0 rgba(255,255,255,.75) !important; }
+  :root .bg-emerald-500:active { box-shadow: var(--press) !important; background: linear-gradient(145deg, #b9bcc1, #dcdee1) !important; }
+  :root #fab { box-shadow: 10px 10px 22px rgba(0,0,0,.6), -5px -5px 14px rgba(255,255,255,.04), inset 0 1px 0 rgba(255,255,255,.75) !important; }
+  /* Tarjeta de crédito: plástico gris claro con brillo suave */
+  .card-plastic { box-shadow: 12px 14px 28px rgba(0,0,0,.58), -6px -6px 16px rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.75), inset 0 -3px 8px rgba(0,0,0,.12); }
+  .pillar { box-shadow: 6px 8px 16px rgba(0,0,0,.5), -3px -3px 10px rgba(255,255,255,.03), inset 0 1px 0 rgba(255,255,255,.55), inset 0 -6px 14px rgba(0,0,0,.18); }
+  /* Iconos: línea fina */
+  svg.lucide { stroke-width: 1.5; }
   body { -webkit-font-smoothing:antialiased; -webkit-tap-highlight-color:transparent; touch-action:manipulation; -webkit-text-size-adjust:100%; }
   button, label, a { -webkit-user-select:none; user-select:none; cursor:pointer; }
   input, select, textarea { font-size:16px !important; }
@@ -48,9 +87,9 @@
   .flip-back { position: absolute; inset: 0; transform: rotateY(180deg); }
   @media (prefers-reduced-motion: reduce) { .flip-inner { transition: none; } }
   /* Casillas de segmentos (selección múltiple con puntito) */
-  .segc:checked + .segv { border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.12); color: #d1fae5; }
-  .segc:checked + .segv .segdot { border-color: #34d399; }
-  .segc:checked + .segv .segdot::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: #34d399; }
+  .segc:checked + .segv { border-color: rgba(255,255,255,.18); background: linear-gradient(145deg, #3a3c41, #2a2c30); color: #eceef0; box-shadow: var(--raise-sm); }
+  .segc:checked + .segv .segdot { border-color: #d3d5d8; }
+  .segc:checked + .segv .segdot::after { content: ''; width: 8px; height: 8px; border-radius: 9999px; background: #e7e8ea; }
   .segc:focus-visible + .segv { outline: 2px solid rgba(52,211,153,.6); outline-offset: 2px; }
 </style>
 </head>
@@ -84,7 +123,7 @@
   <nav id="drawerPanel" class="absolute left-0 top-0 bottom-0 w-[82%] max-w-[320px] bg-[#0c0c0f] border-r border-zinc-800/80 -translate-x-full transition-transform duration-300 ease-out flex flex-col"
     style="padding-top:calc(env(safe-area-inset-top) + 14px); padding-bottom:calc(env(safe-area-inset-bottom) + 14px); padding-left:env(safe-area-inset-left)">
     <div class="px-5 pb-5 flex items-center gap-3">
-      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-700 grid place-items-center text-zinc-950"><i data-lucide="chart-no-axes-combined" class="w-5 h-5"></i></div>
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-zinc-200 to-zinc-500 grid place-items-center text-zinc-900 card-plastic"><i data-lucide="chart-no-axes-combined" class="w-5 h-5"></i></div>
       <div><div class="font-semibold leading-tight">Gestor</div><div class="text-xs text-zinc-500">Finanzas e inventario · <span id="verTag"></span></div></div>
     </div>
     <div id="drawerItems" class="flex-1 overflow-y-auto px-3 space-y-0.5"></div>
@@ -102,7 +141,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.12';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.13';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -466,7 +505,7 @@ function pillarChart(items, title, totalTxt) {
     <div class="flex items-stretch gap-3 overflow-x-auto no-scrollbar px-4 pb-1" style="height:250px">
       ${L.map(x => `<button data-act="${x.act}" data-id="${x.id}" aria-label="${esc(x.label)}: ${fmt(x.amount)}" class="shrink-0 w-[62px] h-full flex flex-col items-center active:opacity-75 transition">
         <div class="flex-1 w-full flex items-end">
-          <div class="relative w-full rounded-[22px] bg-gradient-to-b ${x.grad} shadow-lg shadow-black/30" style="height:calc(58px + (100% - 58px) * ${(x.amount / max).toFixed(4)})">
+          <div class="relative w-full rounded-[22px] bg-gradient-to-b ${x.grad} pillar" style="height:calc(58px + (100% - 58px) * ${(x.amount / max).toFixed(4)})">
             <span class="absolute top-1.5 left-1/2 -translate-x-1/2 w-11 h-11 rounded-full bg-zinc-950/85 ring-2 ring-white/10 grid place-items-center text-white text-[13px] font-semibold">${x.avatar}</span>
           </div>
         </div>
@@ -508,23 +547,27 @@ function groupedLedger(list, id = '') {
   flush();
   return `<div ${id ? `id="${id}"` : ''}>${h}</div>`;
 }
-const CARD_COLORS = { violet: 'from-violet-600 to-purple-900', slate: 'from-slate-600 to-slate-900', sky: 'from-sky-600 to-indigo-900', emerald: 'from-emerald-600 to-teal-900', rose: 'from-rose-600 to-red-900', orange: 'from-orange-500 to-red-800', amber: 'from-amber-500 to-orange-800', zinc: 'from-zinc-600 to-zinc-900' };
+const CARD_COLORS = { violet: 'from-[#e6e7ea] to-[#a4a7ad]', slate: 'from-[#dfe1e4] to-[#979aa0]', sky: 'from-[#e3e6ea] to-[#9fa4ab]', emerald: 'from-[#e2e5e3] to-[#9da3a0]', rose: 'from-[#e8e5e5] to-[#a7a2a2]', orange: 'from-[#e9e7e4] to-[#a8a49e]', amber: 'from-[#e7e6e2] to-[#a6a39b]', zinc: 'from-[#dcdde0] to-[#8f9297]' };
 function dateChip(l, date, d, tone) {
-  return `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-black/30 text-[11px] text-white/90 whitespace-nowrap"><span class="w-1.5 h-1.5 rounded-full ${DOT[tone]}"></span>${l} ${fmtDs(date)} · ${d < 0 ? 'vencido' : d === 0 ? 'hoy' : d + 'd'}</span>`;
+  return `<span class="inline-flex items-center gap-1.5 px-2 py-1 rounded-lg bg-white/45 text-[11px] text-zinc-800 whitespace-nowrap shadow-sm"><span class="w-1.5 h-1.5 rounded-full ${DOT[tone]}"></span>${l} ${fmtDs(date)} · ${d < 0 ? 'vencido' : d === 0 ? 'hoy' : d + 'd'}</span>`;
 }
 function cardVisual(c, wide = false) {
   const i = cardInfo(c);
   const tag = wide ? 'div' : 'button';
-  return `<${tag} ${wide ? '' : `data-act="cardDetail" data-id="${c.id}"`} class="${wide ? 'w-full' : 'w-[280px] shrink-0 snap-start active:scale-[.985]'} block text-left rounded-2xl p-4 bg-gradient-to-br ${CARD_COLORS[c.color] || CARD_COLORS.zinc} relative overflow-hidden shadow-lg shadow-black/40 transition">
-    <div class="absolute -right-12 -top-12 w-40 h-40 rounded-full bg-white/[.07]"></div>
-    <div class="relative flex items-center justify-between gap-2"><span class="font-semibold text-white truncate">${esc(c.name)}</span>${icon('credit-card', 'w-5 h-5 text-white/60 shrink-0')}</div>
-    <div class="relative mt-4 text-[10px] uppercase tracking-[.12em] text-white/65">Pagar este período</div>
-    <div class="relative text-[25px] leading-tight font-semibold text-white tabular-nums">${fmt(i.due)}</div>
-    <div class="relative h-1.5 rounded-full bg-black/25 mt-3 overflow-hidden"><div class="h-full bg-white/85 rounded-full" style="width:${i.pct}%"></div></div>
-    <div class="relative grid grid-cols-3 gap-2 mt-2 text-[10px] text-white/60 tabular-nums">
-      <div class="min-w-0"><div>Disponible</div><div class="text-white/90 text-[11px] truncate">${fmt(i.available)}</div></div>
-      <div class="min-w-0"><div>A meses</div><div class="text-white/90 text-[11px] truncate">${fmt(i.deferred)}</div></div>
-      <div class="min-w-0 text-right"><div>Sig. corte</div><div class="text-white/90 text-[11px] truncate">${fmt(i.fresh)}</div></div>
+  return `<${tag} ${wide ? '' : `data-act="cardDetail" data-id="${c.id}"`} class="${wide ? 'w-full' : 'w-[280px] shrink-0 snap-start active:scale-[.985]'} block text-left rounded-[26px] p-4 bg-gradient-to-br ${CARD_COLORS[c.color] || CARD_COLORS.zinc} relative overflow-hidden card-plastic transition">
+    <div class="absolute -right-10 -top-20 w-56 h-56 rounded-full bg-white/30 blur-2xl"></div>
+    <div class="absolute -left-16 bottom-[-70px] w-52 h-52 rounded-full bg-black/10 blur-2xl"></div>
+    <div class="relative flex items-center justify-between gap-2"><span class="font-semibold text-zinc-900 tracking-tight truncate">${esc(c.name)}</span>${icon('credit-card', 'w-5 h-5 text-zinc-700 shrink-0')}</div>
+    <div class="relative mt-3 flex items-end justify-between gap-3">
+      <div class="min-w-0"><div class="text-[10px] uppercase tracking-[.12em] text-zinc-600">Pagar este período</div>
+      <div class="text-[25px] leading-tight font-semibold text-zinc-950 tabular-nums tracking-tight">${fmt(i.due)}</div></div>
+      <div class="w-10 h-7 shrink-0 rounded-md bg-gradient-to-br from-zinc-100 to-zinc-400 border border-black/10 shadow-inner grid grid-cols-3 gap-px p-1 opacity-90"><span class="col-span-3 border-b border-black/15"></span></div>
+    </div>
+    <div class="relative h-1.5 rounded-full bg-black/10 mt-3 overflow-hidden"><div class="h-full bg-zinc-800 rounded-full" style="width:${i.pct}%"></div></div>
+    <div class="relative grid grid-cols-3 gap-2 mt-2 text-[10px] text-zinc-600 tabular-nums">
+      <div class="min-w-0"><div>Disponible</div><div class="text-zinc-900 font-medium text-[11px] truncate">${fmt(i.available)}</div></div>
+      <div class="min-w-0"><div>A meses</div><div class="text-zinc-900 font-medium text-[11px] truncate">${fmt(i.deferred)}</div></div>
+      <div class="min-w-0 text-right"><div>Sig. corte</div><div class="text-zinc-900 font-medium text-[11px] truncate">${fmt(i.fresh)}</div></div>
     </div>
     <div class="relative flex flex-wrap gap-1.5 mt-3">${dateChip('Corte', i.cut, i.dCut, i.cutTone)}${dateChip('Pago', i.dueDate, i.dDue, i.dueTone)}</div>
   </${tag}>`;
@@ -669,7 +712,7 @@ function confirmDlg(title, msg, okLabel = 'Eliminar', danger = true) {
     d.onclick = e => { const b = e.target.closest('[data-c]'); if (!b) return; d.classList.add('hidden'); d.onclick = null; res(b.dataset.c === '1'); };
   });
 }
-function icons() { try { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 1.8 } }); } catch (e) {} }
+function icons() { try { if (window.lucide) lucide.createIcons({ attrs: { 'stroke-width': 1.5 } }); } catch (e) {} }
 
 const VIEWS = [
   ['dashboard', 'Resumen', 'layout-dashboard'],
@@ -955,7 +998,7 @@ R.clientes = () => {
   const all = S.clients.map(c => { const x = clientSummary(c); x.mv = clientMoves(c.id); x.last = x.mv[0]?.date || ''; return x; });
   let h = viewTabs([['deuda', 'Mayor deuda'], ['az', 'A – Z'], ['reciente', 'Recientes']], mode, 'cliView');
   h += `<div class="grid grid-cols-3 gap-2 mt-4">${kv('Por cobrar', fmt(sum(all, x => x.balance)), 'text-[13px] text-sky-400')}${kv('Clientes', fmtInt(all.length), 'text-[13px]')}${kv('Con adeudo', fmtInt(all.filter(x => x.balance > 0.005).length), 'text-[13px]')}</div>`;
-  const chart = pillarChart(all.map(x => ({ act: 'clientDetail', id: x.c.id, label: x.c.name, amount: x.balance, avatar: esc(initials(x.c.name)), grad: 'from-sky-400 to-sky-700/50' })), 'Saldo por cliente', fmt(sum(all, x => x.balance)));
+  const chart = pillarChart(all.map(x => ({ act: 'clientDetail', id: x.c.id, label: x.c.name, amount: x.balance, avatar: esc(initials(x.c.name)), grad: 'from-zinc-200 to-zinc-500' })), 'Saldo por cliente', fmt(sum(all, x => x.balance)));
   if (chart) h += `<div class="mt-4">${chart}</div>`;
   h += `<div class="flex gap-2 mt-4">${searchBox('cliList', 'Buscar')}${btn('Nuevo', 'newClient', 'user-plus')}</div>`;
   if (!all.length) return h + `<div class="mt-4">${empty('users', 'Sin clientes registrados.')}</div>`;
@@ -1065,11 +1108,11 @@ R.deudas = () => {
   let h = `<div class="rounded-2xl bg-zinc-900/70 border border-zinc-800/80 p-4">
     <div class="text-[12px] text-zinc-400">Total por pagar</div><div class="text-[32px] leading-tight font-semibold tabular-nums tracking-tight text-rose-400">${fmt(total)}</div>
     <div class="text-xs text-zinc-500 mt-0.5">${items.length} compromiso${items.length !== 1 ? 's' : ''} · deudas propias y tarjetas de crédito</div>
-    <div class="flex h-2.5 rounded-full bg-zinc-800 overflow-hidden mt-4">${seg(dOwed, 'bg-amber-500')}${seg(cDue, 'bg-rose-500')}${seg(cLater, 'bg-violet-400')}</div>
+    <div class="flex h-2.5 rounded-full bg-zinc-800 overflow-hidden mt-4">${seg(dOwed, 'bg-zinc-200')}${seg(cDue, 'bg-zinc-400')}${seg(cLater, 'bg-zinc-600')}</div>
     <div class="grid grid-cols-3 gap-2 mt-3">
-      ${[['Deudas propias', dOwed, 'bg-amber-500'], ['TDC este período', cDue, 'bg-rose-500'], ['TDC próximos meses', cLater, 'bg-violet-400']].map(([l, v, c]) => `<div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-2.5 min-w-0"><div class="flex items-start gap-1.5 text-[10px] text-zinc-500 leading-tight min-h-[26px]"><span class="w-2 h-2 mt-0.5 rounded-full shrink-0 ${c}"></span><span>${l}</span></div><div class="font-semibold tabular-nums text-[13px] mt-0.5 truncate">${fmt(v)}</div><div class="text-[10px] text-zinc-500 tabular-nums">${total > 0 ? Math.round(v / total * 100) : 0}%</div></div>`).join('')}
+      ${[['Deudas propias', dOwed, 'bg-zinc-200'], ['TDC este período', cDue, 'bg-zinc-400'], ['TDC próximos meses', cLater, 'bg-zinc-600']].map(([l, v, c]) => `<div class="rounded-xl bg-zinc-950/60 border border-zinc-800 p-2.5 min-w-0"><div class="flex items-start gap-1.5 text-[10px] text-zinc-500 leading-tight min-h-[26px]"><span class="w-2 h-2 mt-0.5 rounded-full shrink-0 ${c}"></span><span>${l}</span></div><div class="font-semibold tabular-nums text-[13px] mt-0.5 truncate">${fmt(v)}</div><div class="text-[10px] text-zinc-500 tabular-nums">${total > 0 ? Math.round(v / total * 100) : 0}%</div></div>`).join('')}
     </div></div>`;
-  const AV = { debt: 'landmark', due: 'credit-card', later: 'calendar-range' }, GR = { debt: 'from-amber-400 to-amber-700/50', due: 'from-rose-400 to-rose-700/50', later: 'from-violet-400 to-violet-700/50' };
+  const AV = { debt: 'landmark', due: 'credit-card', later: 'calendar-range' }, GR = { debt: 'from-zinc-200 to-zinc-500', due: 'from-zinc-300 to-zinc-600', later: 'from-zinc-400 to-zinc-700' };
   const chart = pillarChart(items.map(x => ({ act: x.act, id: x.id, label: x.title.replace(' · este período', ' · período').replace(' · próximos meses', ' · meses'), amount: x.amount, avatar: icon(AV[x.group], 'w-5 h-5'), grad: GR[x.group] })), 'Por compromiso', fmt(total));
   if (chart) h += `<div class="mt-4">${chart}</div>`;
   h += `<div class="flex items-center justify-between mt-6 mb-3"><h2 class="text-[12px] font-semibold uppercase tracking-[.08em] text-zinc-500">Desglose</h2><div class="flex gap-2">${btn('Pagar', 'newPay', 'hand-coins', '', 'ghost')}${btn('Deuda', 'newDebt')}</div></div>`;
@@ -1781,10 +1824,10 @@ $('#importFile').addEventListener('change', async e => { const file = e.target.f
 (function makeIcon() {
   try {
     const c = document.createElement('canvas'); c.width = c.height = 180; const x = c.getContext('2d');
-    x.fillStyle = '#09090b'; x.fillRect(0, 0, 180, 180);
-    const g = x.createLinearGradient(0, 0, 180, 180); g.addColorStop(0, '#34d399'); g.addColorStop(1, '#047857');
+    x.fillStyle = '#131416'; x.fillRect(0, 0, 180, 180);
+    const g = x.createLinearGradient(0, 0, 180, 180); g.addColorStop(0, '#e8eaec'); g.addColorStop(1, '#8f9297');
     x.fillStyle = g; x.beginPath(); x.roundRect ? x.roundRect(30, 30, 120, 120, 30) : x.rect(30, 30, 120, 120); x.fill();
-    x.fillStyle = '#09090b'; x.font = 'bold 76px -apple-system, Helvetica, Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', 90, 94);
+    x.fillStyle = '#17181b'; x.font = 'bold 76px -apple-system, Helvetica, Arial'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText('$', 90, 94);
     const url = c.toDataURL('image/png'); $('#touchIcon').href = url; $('#favIcon').href = url;
   } catch (e) {}
 })();

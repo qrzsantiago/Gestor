@@ -5,6 +5,7 @@ Web App de una sola página (`index.html`) para iPhone (Safari → **Compartir �
 - **Stack:** HTML + JavaScript puro, Tailwind CSS (CDN) y Lucide Icons (CDN).
 - **Persistencia:** LocalStorage. Respaldo/restauración en JSON desde *Respaldo y Ajustes*.
 - **Moneda:** Pesos Mexicanos (MXN), formato `$10,000.00`.
+- **Diseño:** neumorfismo suave y cristal esmerilado en una paleta gris monocromática (fondo gris casi negro con textura sutil, tarjetas antracita, botones de "plástico" gris claro, iconos de línea fina). Verde y rojo muy desaturados solo marcan ingresos y gastos. Las tarjetas de crédito usan un degradado sutil de gris claro a gris medio.
 - **Sin datos precargados:** la app inicia vacía; todos los formularios inician en blanco.
 
 ## Secciones (menú ☰)
