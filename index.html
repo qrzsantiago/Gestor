@@ -102,7 +102,7 @@
    UTILIDADES
    ========================================================= */
 const $ = s => document.querySelector(s);
-const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.4';
+const LS = 'gestor.data.v1', LSUI = 'gestor.ui.v2', APP_VERSION = '2.5';
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 const r2 = n => Math.round(((+n || 0) + Number.EPSILON) * 100) / 100;
 const MXN = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -162,16 +162,18 @@ function normalize(d) {
     if (c.mode !== 'cuotas' && c.mode !== 'credito') c.mode = c.rateLog.some(x => +x.rate > 0) ? 'credito' : 'cuotas';
     if (c.cutDay !== null && c.cutDay !== undefined) c.cutDay = validDay(c.cutDay);
     if (!c.saleId || !d.sales.some(x => x.id === c.saleId)) {
-      const sl = { id: uid(), createdAt: c.createdAt || Date.now(), date: c.date || today(), productId: null, productName: c.concept || (c.type === 'prestamo' ? 'Préstamo' : 'Venta a crédito'),
-        qty: 1, total: +c.principal || 0, clientId: c.clientId || null, pay: c.mode, accountId: null, creditId: c.id, kind: c.type === 'prestamo' ? 'prestamo' : '' };
+      const sl = { id: uid(), createdAt: c.createdAt || Date.now(), date: c.date || today(), productId: null, productName: c.concept || 'Venta a crédito',
+        qty: 1, total: +c.principal || 0, clientId: c.clientId || null, pay: c.mode, accountId: null, creditId: c.id };
       d.sales.push(sl); c.saleId = sl.id;
     }
   });
   d.sales.forEach(x => {
     const c = x.creditId ? d.credits.find(k => k.id === x.creditId) : null;
-    if (c) { x.pay = c.mode; x.accountId = null; if (c.type === 'prestamo') x.kind = 'prestamo'; }
+    if (c) { x.pay = c.mode; x.accountId = null; }
     else { x.creditId = null; x.pay = 'contado'; }
+    delete x.kind;
   });
+  d.credits.forEach(c => { if (c.type === 'prestamo') c.type = 'venta'; if (c.inst && !(c.inst.n >= 1 && ['semanas', 'meses'].includes(c.inst.freq))) delete c.inst; });
   d.cards.forEach(c => {
     if (c.periodBase === undefined) { c.periodBase = +c.base || 0; c.nextBase = 0; c.nextDate = ''; c.other = 0; delete c.base; }
   });
@@ -253,6 +255,8 @@ const soldQty = pid => sum(S.sales.filter(s => s.productId === pid), s => s.qty)
 const stock = p => (+p.base || 0) - soldQty(p.id);
 const paysFor = (kind, id) => S.payments.filter(p => p.kind === kind && p.targetId === id).sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 const STATUS_TONE = { Pendiente: 'warn', Abonado: 'info', Pagado: 'ok' };
+const FREQ_ADJ = { semanas: ['semanal', 'semanales'], meses: ['mensual', 'mensuales'] };
+const planTxt = (n, freq, cuota) => `${n} cuota${n !== 1 ? 's' : ''} ${FREQ_ADJ[freq][n !== 1 ? 1 : 0]} de ${fmt(cuota)}`;
 
 /* Créditos: sin plazos fijos. Interés sobre saldo insoluto en cada fecha de corte. */
 const rateLogSorted = c => [...(c.rateLog || [])].sort((a, b) => (a.date || '').localeCompare(b.date || ''));
@@ -279,8 +283,18 @@ function creditInfo(c) {
     let nx = nextOnOrAfter(cutDay, addDays(T, 1)); const fc = firstCutAfter(start, cutDay); if (nx < fc) nx = fc;
     next = toISO(nx); dNext = daysBetween(T, nx); nextInterest = rate > 0 ? r2(balance * rate / 100) : 0;
   }
+  // Plan de cuotas (semanas o meses): monto por cuota, cuotas cubiertas, próxima cuota y atraso
+  let cuota = null, nCuotas = null, freq = null, covered = null, nextDue = null, dNextDue = null, overdueQ = false, dueCount = 0;
+  if (c.mode === 'cuotas' && c.inst && c.inst.n >= 1 && (c.inst.freq === 'semanas' || c.inst.freq === 'meses')) {
+    nCuotas = parseInt(c.inst.n); freq = c.inst.freq; cuota = r2(P / nCuotas);
+    const dueAt = k => freq === 'semanas' ? addDays(start, 7 * k) : dayIn(start.getFullYear(), start.getMonth() + k, start.getDate());
+    for (let k = 1; k <= nCuotas; k++) { if (dueAt(k) < T) dueCount = k; else break; }
+    covered = Math.min(nCuotas, Math.floor((paid + 0.01) / cuota));
+    if (balance > 0.005) { const nd = dueAt(Math.min(nCuotas, covered + 1)); nextDue = toISO(nd); dNextDue = daysBetween(T, nd); overdueQ = paid + 0.01 < Math.min(total, dueCount * cuota); }
+  }
   const status = balance <= 0.005 ? 'Pagado' : paid > 0 ? 'Abonado' : 'Pendiente';
-  return { c, P, interest, total, paid, balance: Math.max(0, balance), rawBalance: balance, status, next, dNext, nextInterest, ev, pays, rate, cutDay, lastPay: pays.length ? pays[pays.length - 1].date : null };
+  return { c, P, interest, total, paid, balance: Math.max(0, balance), rawBalance: balance, status, next, dNext, nextInterest, ev, pays, rate, cutDay, lastPay: pays.length ? pays[pays.length - 1].date : null,
+    cuota, nCuotas, freq, covered, nextDue, dNextDue, overdueQ, dueCount };
 }
 function debtInfo(d) {
   const pays = paysFor('debt', d.id); const paid = r2(sum(pays, p => p.amount));
@@ -317,7 +331,7 @@ function accFlows(a) {
   f -= sum(S.payments.filter(p => p.kind !== 'credit' && p.accountId === id), p => p.amount);
   f -= sum(S.expenses.filter(e => !isInc(e) && !e.cardId && e.accountId === id), e => e.amount);
   f += sum(S.expenses.filter(e => isInc(e) && e.accountId === id), e => e.amount);
-  f -= sum(S.credits.filter(c => c.type === 'prestamo' && c.accountId === id), c => c.principal);
+  f -= sum(S.credits.filter(c => c.accountId === id), c => c.principal); // solo registros anteriores que sacaron dinero de una cuenta
   f += sum(S.debts.filter(d => d.accountId === id), d => d.amount);
   return r2(f);
 }
@@ -346,13 +360,13 @@ const inRange = (d, r) => !r.start || (d >= r.start && d <= r.end);
 function ledger() {
   const L = [];
   S.sales.forEach(s => {
-    const cr = s.creditId ? byId(S.credits, s.creditId) : null, loan = s.kind === 'prestamo';
+    const cr = s.creditId ? byId(S.credits, s.creditId) : null, out = cr?.accountId || null;
     const payLbl = s.pay === 'cuotas' ? 'Cuotas' : s.pay === 'credito' ? 'Crédito' : '';
-    const acc = loan ? (cr?.accountId || null) : (s.pay === 'contado' ? s.accountId : null);
-    L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, title: `${s.productName || (loan ? 'Préstamo' : 'Venta')}${s.qty > 1 ? ' ×' + s.qty : ''}`,
-      sub: [loan ? 'Préstamo' : 'Venta', cliName(s.clientId), payLbl, accName(acc)].filter(Boolean).join(' · '),
-      amount: s.total, sign: loan ? (acc ? -1 : 0) : (acc ? 1 : 0), acc, client: s.clientId,
-      icon: loan ? 'handshake' : 'shopping-bag', tone: loan ? 'bg-sky-500/10 text-sky-400' : 'bg-emerald-500/10 text-emerald-400', type: 'ventas', kind: loan ? 'prestamo' : s.pay });
+    const acc = out || (s.pay === 'contado' ? s.accountId : null);
+    L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, title: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`,
+      sub: ['Venta', cliName(s.clientId), payLbl, accName(acc)].filter(Boolean).join(' · '),
+      amount: s.total, sign: out ? -1 : (acc ? 1 : 0), acc, client: s.clientId,
+      icon: 'shopping-bag', tone: 'bg-emerald-500/10 text-emerald-400', type: 'ventas', kind: s.pay });
   });
   S.expenses.forEach(e => {
     const inc = isInc(e), card = inc ? null : byId(S.cards, e.cardId), segs = segNames(e.segmentIds).join(', ');
@@ -369,10 +383,8 @@ function ledger() {
     sub = [sub, accName(p.accountId)].filter(Boolean).join(' · ') || '—';
     L.push({ t: 'payment', kind: p.kind, id: p.id, date: p.date, cr: p.createdAt || 0, title, sub, amount: p.amount, sign, acc: p.accountId, card: p.kind === 'card' ? p.targetId : null, client, icon, tone, type: 'abonos' });
   });
-  S.credits.filter(c => c.type === 'prestamo' && !c.saleId).forEach(c => L.push({ t: 'credit', id: c.id, date: c.date, cr: c.createdAt || 0, title: `Préstamo a ${cliName(c.clientId) || 'cliente'}`,
-    sub: [c.concept, accName(c.accountId)].filter(Boolean).join(' · ') || '—', amount: c.principal, sign: c.accountId ? -1 : 0, acc: c.accountId, client: c.clientId, icon: 'handshake', tone: 'bg-sky-500/10 text-sky-400', type: 'prestamos' }));
   S.debts.forEach(d => L.push({ t: 'debt', id: d.id, date: d.date, cr: d.createdAt || 0, title: `Deuda con ${d.creditor || 'acreedor'}`, sub: [d.concept, accName(d.accountId)].filter(Boolean).join(' · ') || '—',
-    amount: d.amount, sign: d.accountId ? 1 : 0, acc: d.accountId, icon: 'landmark', tone: 'bg-amber-500/10 text-amber-400', type: 'prestamos' }));
+    amount: d.amount, sign: d.accountId ? 1 : 0, acc: d.accountId, icon: 'landmark', tone: 'bg-amber-500/10 text-amber-400', type: 'deudas' }));
   return L.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.cr - a.cr));
 }
 
@@ -460,14 +472,14 @@ function accRow(a) {
 }
 function creditRow(i) {
   const c = i.c, pct = i.total > 0 ? i.paid / i.total * 100 : 0;
-  const meta = [c.type === 'prestamo' ? 'Préstamo' : 'Venta', c.mode === 'cuotas' ? 'Cuotas' : (i.rate > 0 ? `Crédito ${pct1(i.rate)}%` : 'Crédito'), c.type === 'prestamo' && creditConcept(c) === 'Préstamo' ? '' : creditConcept(c)].filter(Boolean).map(esc).join(' · ');
+  const meta = [creditConcept(c) || 'Venta', c.mode === 'cuotas' ? (i.nCuotas ? planTxt(i.nCuotas, i.freq, i.cuota) : 'Cuotas') : (i.rate > 0 ? `Crédito ${pct1(i.rate)}%` : 'Crédito')].filter(Boolean).map(esc).join(' · ');
   return `<button data-act="creditDetail" data-id="${c.id}" data-q="${esc((cliName(c.clientId) + ' ' + creditConcept(c)).toLowerCase())}" class="w-full text-left p-4 active:bg-zinc-800/60 block">
     <div class="flex items-start justify-between gap-3">
       <div class="min-w-0"><div class="font-medium truncate">${esc(cliName(c.clientId) || 'Sin cliente')}</div><div class="text-xs text-zinc-500 truncate mt-0.5">${meta}</div></div>
       <div class="text-right shrink-0"><div class="font-semibold tabular-nums">${fmt(i.balance)}</div><div class="text-[11px] text-zinc-500 tabular-nums">de ${fmt(i.total)}</div></div>
     </div>
     <div class="mt-3">${progress(pct)}</div>
-    <div class="flex items-center gap-1.5 mt-3 flex-wrap">${statusBadge(i)}${i.interest > 0 ? badge('Intereses ' + fmt(i.interest), 'warn') : ''}${i.next ? `<span class="text-[11px] text-zinc-500 ml-auto">Corte ${fmtDs(i.next)}</span>` : ''}</div>
+    <div class="flex items-center gap-1.5 mt-3 flex-wrap">${statusBadge(i)}${i.overdueQ ? badge('Atrasado', 'bad') : ''}${i.nCuotas ? badge(`${i.covered}/${i.nCuotas} cuotas`, 'mute') : ''}${i.interest > 0 ? badge('Intereses ' + fmt(i.interest), 'warn') : ''}${i.next ? `<span class="text-[11px] text-zinc-500 ml-auto">Corte ${fmtDs(i.next)}</span>` : i.nextDue ? `<span class="text-[11px] ${i.overdueQ ? 'text-rose-400' : 'text-zinc-500'} ml-auto">Cuota ${fmtDs(i.nextDue)}</span>` : ''}</div>
   </button>`;
 }
 function debtRow(i) {
@@ -513,10 +525,23 @@ function resolveClient(f) {
   if (f.clientId === '__new') { const n = (f.newClient || '').trim(); if (!n) return null; const c = { id: uid(), name: n, phone: '', createdAt: Date.now() }; S.clients.push(c); return c.id; }
   return f.clientId || null;
 }
-/* Forma de pago: Contado · Cuotas (sin interés) · Crédito / Préstamo (con % y día de corte) */
+/* Forma de pago: Contado · Cuotas (semanas o meses, sin interés) · Crédito (con % y día de corte) */
 function paySeg(v) {
   const o = (val, inner) => `<label class="relative block"><input type="radio" name="pay" value="${val}" ${v === val ? 'checked' : ''} class="peer sr-only"><span class="flex flex-col items-center justify-center h-12 px-1 rounded-lg text-[13px] font-medium leading-tight text-center text-zinc-400 peer-checked:bg-zinc-700 peer-checked:text-white transition">${inner}</span></label>`;
-  return `<div class="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800">${o('contado', 'Contado')}${o('cuotas', 'Cuotas')}${o('credito', '<span class="text-[11px]">Crédito</span><span class="text-[11px]">Préstamo</span>')}</div>`;
+  return `<div class="grid grid-cols-3 gap-1 p-1 rounded-xl bg-zinc-950 border border-zinc-800">${o('contado', 'Contado')}${o('cuotas', 'Cuotas')}${o('credito', 'Crédito')}</div>`;
+}
+function cuotasFields(c) {
+  const inst = c && c.mode === 'cuotas' ? c.inst : null;
+  return `<div class="rounded-2xl border border-zinc-800 bg-zinc-950/40 px-4 pt-4 mb-4">
+    ${fld('Plazo', seg('freq', [['semanas', 'Semanas'], ['meses', 'Meses']], inst?.freq || ''))}
+    ${fld('Número de cuotas', stepper('nCuotas', inst?.n ?? '', 1))}
+    <div id="cuotaPrev" class="hidden -mt-1 pb-4 text-[13px] text-zinc-300"></div>
+  </div>`;
+}
+function cuotasCheck(f) {
+  if (f.freq !== 'semanas' && f.freq !== 'meses') return 'Elige si las cuotas son por semanas o por meses';
+  if (!(parseInt(f.nCuotas) >= 1)) return 'Escribe el número de cuotas';
+  return null;
 }
 function interestFields(c) {
   const on = c && c.mode === 'credito';
@@ -530,7 +555,8 @@ function termsCheck(f) {
 }
 function termsApply(c, f, isNew, mode) {
   const prevMode = c.mode; c.mode = mode;
-  if (mode === 'cuotas') { c.rateLog = [{ date: c.date, rate: 0 }]; c.cutDay = null; return; }
+  if (mode === 'cuotas') { c.rateLog = [{ date: c.date, rate: 0 }]; c.cutDay = null; c.inst = { freq: f.freq, n: parseInt(f.nCuotas) }; return; }
+  delete c.inst;
   const rate = Math.max(0, num(f.rate));
   if (isNew || prevMode !== 'credito' || !Array.isArray(c.rateLog) || !c.rateLog.length) c.rateLog = [{ date: c.date, rate }];
   else if (Math.abs(curRate(c) - rate) > 1e-9) {
@@ -652,8 +678,10 @@ function computeAlerts() {
     if (i.due > 0.005 && i.dDue <= 7) A.push({ tone: i.dDue <= 3 ? 'bad' : 'warn', icon: 'calendar-clock', text: `Pago de <b>${esc(c.name)}</b> ${dayWord(i.dDue)}`, sub: `A pagar este período ${fmt(i.due)}`, act: 'cardDetail', id: c.id });
     if (i.dCut <= 3) A.push({ tone: 'warn', icon: 'scissors', text: `Corte de <b>${esc(c.name)}</b> ${dayWord(i.dCut)}`, sub: fmtD(i.cut), act: 'cardDetail', id: c.id });
   });
-  S.credits.forEach(c => { const i = creditInfo(c); if (i.balance <= 0.005 || i.dNext === null) return;
-    if (i.dNext <= 3) A.push({ tone: 'info', icon: 'hand-coins', text: `Corte de <b>${esc(cliName(c.clientId) || 'cliente')}</b> ${dayWord(i.dNext)}`, sub: `Saldo ${fmt(i.balance)}${i.nextInterest ? ` · Interés ${fmt(i.nextInterest)}` : ''}`, act: 'creditDetail', id: c.id });
+  S.credits.forEach(c => { const i = creditInfo(c); if (i.balance <= 0.005) return;
+    if (i.overdueQ) A.push({ tone: 'bad', icon: 'circle-alert', text: `<b>${esc(cliName(c.clientId) || 'Cliente')}</b> tiene cuotas atrasadas`, sub: `Cuota ${fmt(i.cuota)} · vencía ${fmtD(i.nextDue)}`, act: 'creditDetail', id: c.id });
+    else if (i.nextDue && i.dNextDue >= 0 && i.dNextDue <= 3) A.push({ tone: 'info', icon: 'hand-coins', text: `Cuota de <b>${esc(cliName(c.clientId) || 'cliente')}</b> ${dayWord(i.dNextDue)}`, sub: `${fmt(i.cuota)} · cuota ${i.covered + 1} de ${i.nCuotas}`, act: 'creditDetail', id: c.id });
+    if (i.dNext !== null && i.dNext <= 3) A.push({ tone: 'info', icon: 'hand-coins', text: `Corte de <b>${esc(cliName(c.clientId) || 'cliente')}</b> ${dayWord(i.dNext)}`, sub: `Saldo ${fmt(i.balance)}${i.nextInterest ? ` · Interés ${fmt(i.nextInterest)}` : ''}`, act: 'creditDetail', id: c.id });
   });
   S.debts.forEach(d => { const i = debtInfo(d); if (i.balance > 0.005 && i.dDue !== null && i.dDue <= 7) A.push({ tone: i.dDue <= 2 ? 'bad' : 'warn', icon: 'landmark', text: i.dDue < 0 ? `Deuda con <b>${esc(d.creditor)}</b> vencida` : `Pagar a <b>${esc(d.creditor)}</b> ${dayWord(i.dDue)}`, sub: `Saldo ${fmt(i.balance)}`, act: 'debtDetail', id: d.id }); });
   const low = S.products.filter(p => stock(p) <= lowStock());
@@ -695,9 +723,9 @@ function payFlipCard() {
   </div>`;
 }
 function salesStats(r) {
-  const A = S.sales.filter(s => inRange(s.date, r)), L = A.filter(s => s.kind !== 'prestamo'), loans = A.filter(s => s.kind === 'prestamo');
-  return { list: L, total: sum(L, s => s.total), units: sum(L, s => s.qty), count: L.length, contado: sum(L.filter(s => s.pay === 'contado'), s => s.total),
-    credito: sum(L.filter(s => s.pay !== 'contado'), s => s.total), prestado: sum(loans, s => s.total), loans: loans.length };
+  const L = S.sales.filter(s => inRange(s.date, r));
+  return { list: L, total: sum(L, s => s.total), units: sum(L.filter(s => s.productId), s => s.qty), count: L.length, contado: sum(L.filter(s => s.pay === 'contado'), s => s.total),
+    credito: sum(L.filter(s => s.pay !== 'contado'), s => s.total) };
 }
 
 R.dashboard = () => {
@@ -803,9 +831,8 @@ R.ventas = () => {
   const r = range(UI.salesP, UI.salesO), st = salesStats(r);
   h += `<div class="mt-4">${periodBar('sales')}</div>`;
   h += `<div class="grid grid-cols-2 gap-3 mt-3">${kv('Total vendido', fmt(st.total))}${kv('Unidades', fmtInt(st.units))}${kv('Contado', fmt(st.contado), 'text-emerald-400')}${kv('Cuotas / crédito', fmt(st.credito), 'text-sky-400')}</div>`;
-  if (st.loans) h += `<div class="mt-2 px-1 text-xs text-zinc-500">Préstamos de dinero en el período: <b class="text-zinc-300 tabular-nums">${fmt(st.prestado)}</b> (${st.loans})</div>`;
   h += `<div class="flex items-center gap-2 mt-4 mb-3">${searchBox('saleList', 'Buscar')}${btn('Nueva', 'newSale')}</div>`;
-  h += `<div class="text-xs text-zinc-500 mb-3 px-1">${st.count} venta${st.count !== 1 ? 's' : ''}${st.loans ? ` · ${st.loans} préstamo${st.loans !== 1 ? 's' : ''}` : ''} · ${esc(r.label)}</div>`;
+  h += `<div class="text-xs text-zinc-500 mb-3 px-1">${st.count} venta${st.count !== 1 ? 's' : ''} · ${esc(r.label)}</div>`;
   const L = ledger().filter(x => x.t === 'sale' && inRange(x.date, r));
   h += L.length ? groupedLedger(L, 'saleList') : empty('shopping-bag', 'Sin ventas en este período.');
   return h;
@@ -819,9 +846,9 @@ function clientSummary(c) {
 }
 function clientMoves(id) {
   const L = [];
-  S.sales.filter(s => s.clientId === id).forEach(s => { const loan = s.kind === 'prestamo', cash = s.pay === 'contado' && !loan;
-    L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, concept: `${s.productName || (loan ? 'Préstamo' : 'Venta')}${s.qty > 1 ? ' ×' + s.qty : ''}`,
-      label: loan ? 'Préstamo' : cash ? 'Venta de contado' : s.pay === 'cuotas' ? 'Venta a cuotas' : 'Venta a crédito', amount: s.total, tone: cash ? 'text-zinc-300' : 'text-amber-300' }); });
+  S.sales.filter(s => s.clientId === id).forEach(s => { const cash = s.pay === 'contado';
+    L.push({ t: 'sale', id: s.id, date: s.date, cr: s.createdAt || 0, concept: `${s.productName || 'Venta'}${s.qty > 1 ? ' ×' + s.qty : ''}`,
+      label: cash ? 'Venta de contado' : s.pay === 'cuotas' ? 'Venta a cuotas' : 'Venta a crédito', amount: s.total, tone: cash ? 'text-zinc-300' : 'text-amber-300' }); });
   S.payments.filter(p => p.kind === 'credit').forEach(p => { const c = byId(S.credits, p.targetId); if (!c || c.clientId !== id) return;
     L.push({ t: 'payment', id: p.id, date: p.date, cr: p.createdAt || 0, concept: creditConcept(c) || 'Abono', label: 'Abono', amount: p.amount, tone: 'text-emerald-400' }); });
   return L.sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.cr - a.cr));
@@ -1003,40 +1030,44 @@ function saleForm(id, preset = {}) {
   const cr = s?.creditId ? byId(S.credits, s.creditId) : null;
   const avail = p => stock(p) + (s && s.productId === p.id ? s.qty : 0);
   const prods = S.products.filter(p => avail(p) > 0 || p.id === s?.productId).sort(byName);
-  const pid = s ? (s.kind === 'prestamo' ? '__loan' : byId(S.products, s.productId) ? s.productId : '__free') : (preset.productId || '');
+  const pid = s ? (byId(S.products, s.productId) ? s.productId : '__free') : (preset.productId || '');
   openSheet({
-    title: s ? (s.kind === 'prestamo' ? 'Editar préstamo' : 'Editar venta') : 'Nueva venta', submit: s ? 'Guardar cambios' : 'Registrar', exists: () => !id || !!byId(S.sales, id),
+    title: s ? 'Editar venta' : 'Nueva venta', submit: s ? 'Guardar cambios' : 'Registrar venta', exists: () => !id || !!byId(S.sales, id),
     body: () => `
-      ${fld('Producto', sel('productId', [{ v: '', l: '—' }, ...prods.map(p => ({ v: p.id, l: `${p.name} (${avail(p)} u.)` })), { v: '__free', l: 'Venta sin inventario' }, { v: '__loan', l: 'Préstamo de dinero' }], pid), '<span id="availTxt"></span>')}
-      <div data-show="productId=__free|__loan">${fld('Concepto', inp('concept', s && (pid === '__free' || pid === '__loan') ? s.productName : ''))}</div>
-      <div data-show="productId!=__loan">${fld('Cantidad de unidades', stepper('qty', s && s.kind !== 'prestamo' ? s.qty : '', 1))}</div>
+      ${fld('Producto', sel('productId', [{ v: '', l: '—' }, ...prods.map(p => ({ v: p.id, l: `${p.name} (${avail(p)} u.)` })), { v: '__free', l: 'Venta sin inventario' }], pid), '<span id="availTxt"></span>')}
+      <div data-show="productId=__free">${fld('Concepto', inp('concept', s && pid === '__free' ? s.productName : ''))}</div>
+      <div data-show="productId!=|__free">${fld('Cantidad de unidades', stepper('qty', s && pid !== '__free' ? s.qty : '', 1))}</div>
       ${fld('Monto', money('total', s ? s.total : ''))}
       ${clientField(s?.clientId || preset.clientId || '')}
       ${fld('Forma de pago', paySeg(s?.pay || ''))}
       <div data-show="pay=contado">${fld('Cuenta destino', sel('accountId', accOpts(), s && s.pay === 'contado' ? (s.accountId || '') : defaultAcc()))}</div>
+      <div data-show="pay=cuotas">${cuotasFields(cr)}</div>
       <div data-show="pay=credito">${interestFields(cr)}</div>
-      <div data-show="productId=__loan">${fld('Sale de la cuenta', sel('loanAccountId', accOpts(), cr ? (cr.accountId || '') : defaultAcc()))}</div>
       ${cr ? `<div class="text-xs text-zinc-500 -mt-1 mb-4">Abonado hasta hoy: ${fmt(creditInfo(cr).paid)}</div>` : ''}
       ${fld('Fecha', dateInp('date', s?.date || ''))}`,
     onInput(f) {
       const E = f.elements, p = byId(S.products, E.productId.value);
       const q = parseInt(E.qty.value) || 0, a = p ? avail(p) : null;
       f.querySelector('#availTxt').innerHTML = p ? `<span class="${q > a ? 'text-rose-400' : ''}">Disponibles: ${fmtInt(a)} u.${q ? ` · Quedarán ${fmtInt(Math.max(0, a - q))} u.` : ''}</span>` : '';
+      const fr = getVal(f, 'freq'), n = parseInt(E.nCuotas.value) || 0, t = num(E.total.value), pv = f.querySelector('#cuotaPrev');
+      const ok = FREQ_ADJ[fr] && n >= 1 && t > 0;
+      pv.classList.toggle('hidden', !ok);
+      if (ok) pv.innerHTML = `${planTxt(n, fr, r2(t / n)).replace(/de (\$[\d,.]+)$/, 'de <b class="text-white tabular-nums">$1</b>')}`;
     },
     async onSubmit(f) {
-      if (!f.productId) return err('Selecciona un producto, "Venta sin inventario" o "Préstamo de dinero"');
-      const loan = f.productId === '__loan', free = f.productId === '__free';
-      const p = loan || free ? null : byId(S.products, f.productId);
-      if (!loan && !free && !p) return err('El producto ya no existe');
+      if (!f.productId) return err('Selecciona un producto o "Venta sin inventario"');
+      const free = f.productId === '__free', p = free ? null : byId(S.products, f.productId);
+      if (!free && !p) return err('El producto ya no existe');
       if (free && !(f.concept || '').trim()) return err('Escribe el concepto de la venta');
-      const qty = loan ? 1 : parseInt(f.qty); if (!(qty >= 1)) return err('Escribe la cantidad de unidades');
+      const qty = p ? parseInt(f.qty) : 1;
+      if (p && !(qty >= 1)) return err('Escribe la cantidad de unidades');
       if (p && qty > avail(p)) return err(`Unidades insuficientes (disponibles: ${avail(p)})`);
       const total = r2(num(f.total)); if (total <= 0) return err('Escribe el monto');
       const pay = ['contado', 'cuotas', 'credito'].includes(f.pay) ? f.pay : '';
       if (!pay) return err('Elige la forma de pago');
-      if (loan && pay === 'contado') return err('Un préstamo se registra en Cuotas o en Crédito / Préstamo');
       if (f.clientId === '__new' && !(f.newClient || '').trim()) return err('Escribe el nombre del nuevo cliente');
       if (pay !== 'contado' && !f.clientId) return err('Selecciona el cliente');
+      if (pay === 'cuotas') { const t = cuotasCheck(f); if (t) return err(t); }
       if (pay === 'credito') { const t = termsCheck(f); if (t) return err(t); }
       if (s && s.creditId && pay === 'contado') {
         const np = paysFor('credit', s.creditId).length;
@@ -1044,20 +1075,21 @@ function saleForm(id, preset = {}) {
       }
       const clientId = resolveClient(f);
       const rec = s || { id: uid(), createdAt: Date.now() };
-      Object.assign(rec, { date: f.date || today(), productId: p ? p.id : null, productName: p ? p.name : ((f.concept || '').trim() || 'Préstamo'), qty, total, clientId,
-        pay, kind: loan ? 'prestamo' : '', accountId: pay === 'contado' ? (f.accountId || null) : null });
+      Object.assign(rec, { date: f.date || today(), productId: p ? p.id : null, productName: p ? p.name : f.concept.trim(), qty, total, clientId,
+        pay, accountId: pay === 'contado' ? (f.accountId || null) : null });
+      delete rec.kind;
       if (pay !== 'contado') {
         let c = byId(S.credits, rec.creditId), isNew = false;
-        if (!c) { c = { id: uid(), createdAt: Date.now(), saleId: rec.id, concept: '' }; S.credits.push(c); rec.creditId = c.id; isNew = true; }
-        Object.assign(c, { clientId, principal: total, date: rec.date, type: loan ? 'prestamo' : 'venta', accountId: loan ? (f.loanAccountId || null) : null });
+        if (!c) { c = { id: uid(), createdAt: Date.now(), saleId: rec.id, concept: '', accountId: null }; S.credits.push(c); rec.creditId = c.id; isNew = true; }
+        Object.assign(c, { clientId, principal: total, date: rec.date, type: 'venta' });
         termsApply(c, f, isNew, pay);
       } else if (rec.creditId) { removeCreditData(rec.creditId); rec.creditId = null; }
       if (!s) S.sales.push(rec);
-      return s ? (loan ? 'Préstamo actualizado' : 'Venta actualizada') : `${loan ? 'Préstamo' : 'Venta'} registrad${loan ? 'o' : 'a'} · ${fmt(total)}`;
+      return s ? 'Venta actualizada' : `Venta registrada · ${fmt(total)}`;
     },
     onDelete: s ? async () => {
       const np = s.creditId ? paysFor('credit', s.creditId).length : 0;
-      if (!await confirmDlg(s.kind === 'prestamo' ? 'Eliminar préstamo' : 'Eliminar venta', `Se eliminará ${s.kind === 'prestamo' ? 'el préstamo' : 'la venta'}${byId(S.products, s.productId) ? ` y se devolverán ${s.qty} u. al inventario` : ''}${np ? `, junto con ${np} abono(s)` : ''}.`)) return false;
+      if (!await confirmDlg('Eliminar venta', `Se eliminará la venta${byId(S.products, s.productId) ? ` y se devolverán ${s.qty} u. al inventario` : ''}${np ? `, junto con ${np} abono(s)` : ''}.`)) return false;
       S.sales = S.sales.filter(x => x.id !== s.id); if (s.creditId) removeCreditData(s.creditId);
     } : null,
   });
@@ -1094,7 +1126,7 @@ function payForm(id, preset = {}) {
     title: p ? 'Editar abono' : 'Registrar abono', submit: p ? 'Guardar cambios' : 'Registrar abono', exists: () => !id || !!byId(S.payments, id), focus: (tId && !p) ? 'amount' : null,
     body: () => `
       ${fld('Aplicar a', seg('kind', [['credit', 'Cobro cliente'], ['debt', 'Deuda propia'], ['card', 'Tarjeta']], kind))}
-      <div data-show="kind=credit">${fld('Crédito / préstamo', tsel('credit'))}</div>
+      <div data-show="kind=credit">${fld('Venta a cuotas / crédito', tsel('credit'))}</div>
       <div data-show="kind=debt">${fld('Deuda', tsel('debt'))}</div>
       <div data-show="kind=card">${fld('Tarjeta', tsel('card'))}</div>
       <div id="payInfo" class="hidden -mt-1 mb-4 flex items-center justify-between gap-3 rounded-xl bg-zinc-950/60 border border-zinc-800 px-3.5 py-2.5"></div>
@@ -1315,7 +1347,7 @@ const payRows = pays => pays.length ? listBox([...pays].reverse().map(p => `<but
 
 function creditDetail(id) {
   openSheet({
-    title: 'Detalle del crédito', exists: () => !!byId(S.credits, id),
+    title: byId(S.credits, id)?.mode === 'cuotas' ? 'Venta a cuotas' : 'Venta a crédito', exists: () => !!byId(S.credits, id),
     body: () => {
       const c = byId(S.credits, id); if (!c) return ''; const i = creditInfo(c);
       const log = rateLogSorted(c);
@@ -1323,14 +1355,17 @@ function creditDetail(id) {
           <button type="button" data-act="clientDetail" data-id="${c.clientId}" class="text-sm text-zinc-400 inline-flex items-center gap-1">${esc(cliName(c.clientId) || 'Cliente')}${icon('chevron-right', 'w-3.5 h-3.5')}</button>
           <div class="text-[36px] font-semibold tabular-nums tracking-tight mt-1">${fmt(i.balance)}</div>
           <div class="text-xs text-zinc-500">Saldo insoluto</div>
-          <div class="flex justify-center gap-1.5 mt-3">${statusBadge(i)}</div>
+          <div class="flex justify-center gap-1.5 mt-3">${statusBadge(i)}${i.overdueQ ? badge('Atrasado', 'bad') : ''}</div>
         </div>
         <div class="mb-4">${progress(i.total > 0 ? i.paid / i.total * 100 : 0)}</div>
-        <div class="grid grid-cols-2 gap-2">${kv('Monto original', fmt(i.P))}${kv('Intereses generados', fmt(i.interest), 'text-amber-400')}${kv('Total', fmt(i.total))}${kv('Abonado', fmt(i.paid), 'text-emerald-400')}</div>
-        <div class="grid ${i.balance > 0.005 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-4">${i.balance > 0.005 ? actBtn('Registrar abono', 'newPay', 'hand-coins', `data-kind="credit" data-target="${c.id}"`, true) : ''}${actBtn(c.type === 'prestamo' ? 'Editar préstamo' : 'Editar venta', 'editCredit', 'pencil', `data-id="${c.id}"`)}</div>
+        <div class="grid grid-cols-2 gap-2">${c.mode === 'cuotas'
+          ? `${kv('Monto de la venta', fmt(i.P))}${kv('Por cuota', i.cuota ? fmt(i.cuota) : '—')}${kv('Cuotas cubiertas', i.nCuotas ? `${i.covered} de ${i.nCuotas}` : '—')}${kv('Abonado', fmt(i.paid), 'text-emerald-400')}`
+          : `${kv('Monto original', fmt(i.P))}${kv('Intereses generados', fmt(i.interest), 'text-amber-400')}${kv('Total', fmt(i.total))}${kv('Abonado', fmt(i.paid), 'text-emerald-400')}`}</div>
+        <div class="grid ${i.balance > 0.005 ? 'grid-cols-2' : 'grid-cols-1'} gap-2 mt-4">${i.balance > 0.005 ? actBtn('Registrar abono', 'newPay', 'hand-coins', `data-kind="credit" data-target="${c.id}"`, true) : ''}${actBtn('Editar venta', 'editCredit', 'pencil', `data-id="${c.id}"`)}</div>
         <div class="mt-4 divide-y divide-zinc-800/70">
-          ${row('Tipo', c.type === 'prestamo' ? 'Préstamo de dinero' : 'Venta')}
-          ${row('Forma de pago', c.mode === 'cuotas' ? 'Cuotas (sin interés)' : 'Crédito / Préstamo')}
+          ${row('Forma de pago', c.mode === 'cuotas' ? 'Cuotas (sin interés)' : 'Crédito')}
+          ${i.nCuotas ? row('Plan', planTxt(i.nCuotas, i.freq, i.cuota)) : ''}
+          ${i.nextDue ? row(i.overdueQ ? 'Cuota atrasada' : 'Próxima cuota', `<span class="${i.overdueQ ? 'text-rose-400' : ''}">${fmtD(i.nextDue)}</span> <span class="text-zinc-500">(${dayWord(i.dNextDue)})</span>`) : ''}
           ${creditConcept(c) ? row('Concepto', esc(creditConcept(c))) : ''}
           ${c.mode === 'credito' ? row('Interés actual', i.rate > 0 ? `${pct1(i.rate)}% sobre saldo insoluto` : 'Sin interés') : ''}
           ${c.mode === 'credito' && log.length > 1 ? row('Cambios de tasa', log.map(x => `${pct1(+x.rate)}% desde ${fmtDs(x.date)}`).join('<br>')) : ''}
@@ -1339,11 +1374,11 @@ function creditDetail(id) {
           ${i.next && i.nextInterest ? row('Interés al próximo corte', `<span class="text-amber-400">${fmt(i.nextInterest)}</span> <span class="text-zinc-500">si no hay abonos</span>`) : ''}
           ${row('Fecha de inicio', fmtD(c.date))}
           ${i.lastPay ? row('Último abono', fmtD(i.lastPay)) : ''}
-          ${c.type === 'prestamo' && c.accountId ? row('Salió de', esc(accName(c.accountId))) : ''}
+          ${c.accountId ? row('Salió de la cuenta', esc(accName(c.accountId))) : ''}
         </div>
         ${subH(`Abonos (${i.pays.length})`)}${payRows(i.pays)}
         ${i.ev.length ? subH('Intereses sobre saldo insoluto') + listBox(i.ev.slice().reverse().map(e => `<div class="flex items-center justify-between gap-3 px-3.5 py-2.5 text-sm"><span><span class="block">Corte ${fmtD(e.date)} · ${pct1(e.rate)}%</span><span class="block text-xs text-zinc-500 tabular-nums">Saldo insoluto ${fmt(e.base)}</span></span><span class="tabular-nums text-amber-400 font-medium">+${fmt(e.amt)}</span></div>`).join('')) : ''}
-        <button type="button" data-act="delCredit" data-id="${c.id}" class="w-full h-11 mt-6 mb-2 rounded-xl text-rose-400 bg-rose-500/[.07] border border-rose-500/15 text-sm font-medium">Eliminar ${c.type === 'prestamo' ? 'préstamo' : 'crédito'}</button>`;
+        <button type="button" data-act="delCredit" data-id="${c.id}" class="w-full h-11 mt-6 mb-2 rounded-xl text-rose-400 bg-rose-500/[.07] border border-rose-500/15 text-sm font-medium">Eliminar venta</button>`;
     },
   });
 }
